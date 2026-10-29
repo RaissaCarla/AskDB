@@ -218,3 +218,20 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# AskDB - arquivos locais
+.env
+.env.*
+!.env.example
+
+# Ambientes virtuais Python
+.venv/
+venv/
+
+# Frontend
+node_modules/
+dist/
+
+# Arquivos do sistema operacional
+.DS_Store
+Thumbs.db
