@@ -1,0 +1,114 @@
+classDiagram
+    direction TB
+
+    class GenerateSqlUseCase {
+        +SchemaCatalogPort catalog
+        +LLMClientPort llm
+        +SqlPolicyValidator validator
+        +execute(SqlGenerationRequest request) SqlProposal
+    }
+    class SchemaCatalogPort {
+        <<Protocol>>
+        +discover() SchemaCatalog
+    }
+    class LLMClientPort {
+        <<Protocol>>
+        +generate(str context) str
+    }
+    class PostgresDatabaseAdapter {
+        -str _database_url
+        +discover() SchemaCatalog
+    }
+    class OllamaLLMClientAdapter {
+        +Settings settings
+        +transport
+        +generate(str context) str
+    }
+    class SqlPolicyValidator {
+        +validate(str sql) ValidationResult
+    }
+    class Settings {
+        +SecretStr database_url
+        +str ollama_url
+        +str ollama_model
+        +float llm_timeout
+        +float connect_timeout
+        +from_env(environ, env_file) Settings
+    }
+    class ApplicationError {
+        +str code
+        +str message
+    }
+    class DataModel {
+        <<Pydantic>>
+        +model_config : strict, extra=forbid
+    }
+    class SqlGenerationRequest {
+        +str question
+        +normalize(value)
+    }
+    class SqlProposal {
+        +str sql
+        +ValidationResult validation
+    }
+    class ValidationResult {
+        +status : approved ou blocked
+        +List~ValidationReason~ reasons
+        +consistent()
+    }
+    class ValidationReason {
+        +str code
+        +str message
+    }
+    class SchemaCatalog {
+        +List~Table~ tables
+    }
+    class Table {
+        +str schema_name
+        +str name
+        +List~Column~ columns
+        +List~str~ primary_key
+        +List~ForeignKey~ foreign_keys
+    }
+    class Column {
+        +str name
+        +str data_type
+        +bool nullable
+    }
+    class ForeignKey {
+        +List~str~ columns
+        +str target_schema
+        +str target_table
+        +List~str~ target_columns
+    }
+
+    GenerateSqlUseCase --> SchemaCatalogPort : consulta
+    GenerateSqlUseCase --> LLMClientPort : solicita proposta
+    GenerateSqlUseCase --> SqlPolicyValidator : valida
+    GenerateSqlUseCase ..> SqlGenerationRequest : recebe
+    GenerateSqlUseCase ..> SqlProposal : retorna
+    GenerateSqlUseCase ..> ApplicationError : propaga
+    SchemaCatalogPort <|.. PostgresDatabaseAdapter : conformidade estrutural
+    LLMClientPort <|.. OllamaLLMClientAdapter : conformidade estrutural
+    PostgresDatabaseAdapter ..> SchemaCatalog : retorna
+    OllamaLLMClientAdapter --> Settings : configuracao
+    SqlPolicyValidator ..> ValidationResult : retorna
+    SqlProposal "1" --> "1" ValidationResult : validation
+    ValidationResult "1" --> "0..*" ValidationReason : reasons
+    SchemaCatalog "1" --> "0..*" Table : tables
+    Table "1" --> "0..*" Column : columns
+    Table "1" --> "0..*" ForeignKey : foreign_keys
+
+    DataModel <|-- SqlGenerationRequest
+    DataModel <|-- SqlProposal
+    DataModel <|-- ValidationResult
+    DataModel <|-- ValidationReason
+    DataModel <|-- SchemaCatalog
+    DataModel <|-- Table
+    DataModel <|-- Column
+    DataModel <|-- ForeignKey
+
+    note for DataModel "Herda BaseModel (Pydantic)."
+    note for Settings "Herda BaseModel; carrega backend/.env."
+    note for ApplicationError "Herda Exception."
+    note for GenerateSqlUseCase "FastAPI e CLI chamam execute().\nbootstrap.build_use_case() conecta os adaptadores.\nNao executa SQL."

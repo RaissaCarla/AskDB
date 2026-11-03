@@ -235,3 +235,6 @@ dist/
 # Arquivos do sistema operacional
 .DS_Store
 Thumbs.db
+
+openspec/
+.agents/

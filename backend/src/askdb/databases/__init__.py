@@ -1,0 +1,1 @@
+"""Descoberta de metadados autorizados."""
