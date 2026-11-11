@@ -3,7 +3,7 @@
 
 A etapa de pré-projeto permitiu delimitar a proposta de um sistema de apoio à análise de dados por meio de perguntas em linguagem natural, com PostgreSQL como sistema gerenciador de banco de dados inicialmente suportado. Foram estabelecidos o fluxo principal da aplicação, os requisitos e a organização do desenvolvimento em incrementos. A V0 será utilizada como prova de conceito para verificar a viabilidade técnica da solução, enquanto a V1 constituirá o Produto Mínimo Viável e o compromisso de entrega do trabalho.
 
-No estado atual, o projeto dispõe de documentação e de rascunhos iniciais de módulos, ainda pouco integrados. Dessa forma, as conclusões desta etapa dizem respeito às definições e à organização da proposta. A correção das respostas, a efetividade dos mecanismos de segurança e a adequação da experiência de uso ainda deverão ser verificadas durante o desenvolvimento e a avaliação do protótipo.
+O marco de 20\% já foi entregue e demonstrou a integração entre introspecção do PostgreSQL, geração via Ollama e validação independente, sem executar a SQL proposta. A V0, prevista para a semana de 9 a 15 de novembro de 2026, ampliará esse núcleo com contexto por conexão, confirmação e execução controlada. A V1 permanece como entrega do semestre seguinte. A correção geral das respostas, a segurança da execução e a experiência desktop ainda dependerão das avaliações dos próximos incrementos.
 
 \section{Papel do Contexto na Solução}
 
@@ -13,22 +13,28 @@ Por esse motivo, o módulo de descoberta e introspecção do banco, associado à
 
 Entretanto, a estrutura do banco não descreve necessariamente todo o significado de negócio dos dados. Nomes, comentários e amostras poderão auxiliar a interpretação, mas códigos internos e conceitos como faturamento, pedido concluído ou cliente ativo podem depender de regras não explicitadas nas tabelas. A suficiência do contexto disponível será, portanto, uma questão a investigar, sem pressupor que a introspecção permita reconstruir automaticamente todas as regras de negócio.
 
-Para a V0 e a V1, a utilização de amostras dependerá de autorização explícita do usuário. Quando autorizada, a coleta será limitada a até cem registros por tabela, incluindo todas as colunas. Quando recusada, o contexto será composto apenas pelos metadados estruturais disponíveis. Esse consentimento será tratado como uma decisão binária, sem introduzir mecanismos adicionais de seleção de colunas no escopo obrigatório do MVP.
+Para a V0 e a V1, amostras serão opcionais e dependerão de autorização por tabela, limitadas a cem registros com todas as colunas acessíveis à role; o envio remoto exigirá consentimento separado. A recusa não impedirá o uso de metadados e do contexto de negócio validado. Na V0, cada conexão poderá receber um \texttt{context.md} manual; na V1, uma entrevista de até quinze perguntas apoiará sua construção, sempre mediante confirmação do usuário. Resultados de consultas não serão reutilizados como contexto da LLM.
 
 \section{Definições Consolidadas e Pendências}
 
-A implementação utilizará Python e FastAPI no backend e React, Vite e TypeScript na interface. O Electron será empregado para disponibilizar a interface como aplicação desktop, integrada ao backend executado localmente. A execução local será a estratégia principal da V1, sem compromisso de implantação pública em nuvem.
+A implementação utilizará Python e FastAPI no backend e React, Vite e TypeScript na interface. O Electron será empregado para disponibilizar a interface como aplicação desktop, integrada ao backend executado localmente. O backend será incluído no instalador. O núcleo de consulta permanecerá local; cadastro, login e registro básico de contas e instalações serão atendidos por um Control Plane separado em nuvem, sem conteúdo das consultas.
 
 A segurança será apoiada no uso de credenciais com permissões somente de leitura, na validação independente da consulta gerada e no controle da execução pelo backend. A avaliação realizada pelo modelo sobre a solicitação terá caráter complementar e não substituirá os mecanismos de restrição do banco e de validação da aplicação.
 
-O processamento de uma pergunta admitirá, no máximo, três tentativas no total: uma tentativa inicial e até duas correções automáticas. Cada consulta produzida deverá passar novamente pela validação antes da execução. Esgotado esse limite, a aplicação encerrará a operação de forma controlada e informará a falha ao usuário.
+O processamento de uma pergunta admitirá, no máximo, três tentativas no total: uma tentativa inicial e até duas correções automáticas. Cada consulta produzida deverá passar novamente pela validação e pela confirmação explícita do usuário antes da execução, vinculada à SQL exata e à conexão, com transação somente leitura, timeout de trinta segundos e limite de retorno. Esgotado esse limite, a aplicação encerrará a operação de forma controlada e informará a falha ao usuário.
 
-Ainda deverão ser definidos o provedor e o modelo de linguagem inicial, os parâmetros operacionais de execução e as metas definitivas de desempenho. A escolha do modelo será apoiada em testes internos, considerando correção, capacidade de seguir instruções, latência e custo, preservando a possibilidade de substituição do provedor.
+Ollama local e API externa com chave do usuário são as duas categorias previstas para a V1; o fornecedor remoto, os modelos definitivos, a política de sessão offline e as metas finais de desempenho ainda serão definidos. As configurações e o histórico de conversas persistirão em SQLite, enquanto o contexto de negócio permanecerá em Markdown e os segredos salvos opcionalmente serão protegidos pelo mecanismo do Windows.
+
+\section{Maturidade do Escopo e Lições Aprendidas}
+
+A evolução do planejamento permitiu separar a demonstração do núcleo técnico, a prova de conceito executável e o produto desktop, evitando atribuir aos 20\% funcionalidades que pertencem à V0 ou à V1. A integração inicial também consolidou contratos reutilizáveis entre geração, banco e modelo de linguagem, sem exigir que o diagrama conceitual reproduza cada classe da implementação.
+
+Outra definição central foi distinguir estrutura técnica de conhecimento de negócio: a introspecção descobre os objetos autorizados, mas as regras dependem de validação humana e pertencem à conexão. Essa separação orientou a escolha de um arquivo de contexto simples, de persistência local enxuta e de confirmação explícita antes de cada execução. O refinamento reforçou o princípio de que a IA propõe, o sistema aplica os controles e o usuário valida.
 
 \section{Avaliação Prevista e Evoluções}
 
 A avaliação utilizará um banco PostgreSQL fictício do domínio comercial, contendo clientes, produtos, pedidos e itens de pedido, com dados e regras de negócio previamente conhecidos pelos autores. As perguntas serão formuladas em português e seus resultados serão comparados com consultas de referência e respostas esperadas.
 
-Será investigado o efeito das amostras na qualidade das respostas por meio da comparação entre duas configurações: contexto formado apenas pelo esquema e contexto formado pelo mesmo esquema acrescido de amostras autorizadas. O modelo, as instruções, as perguntas e os dados do banco serão mantidos constantes entre as configurações. Essa comparação permitirá observar o efeito da inclusão de amostras no cenário avaliado, sem pressupor melhoria obrigatória nem generalização dos resultados para outros bancos.
+Será investigado o efeito do contexto de negócio validado por meio da comparação entre o esquema isolado e o mesmo esquema acrescido das regras registradas na entrevista. Modelo, instruções técnicas, perguntas, dados e política de correção serão mantidos constantes. A comparação não pressupõe melhoria obrigatória nem generalização para outros bancos. O desenho e as metas detalhadas serão revisados com o orientador; amostras, se usadas em estudo complementar, terão consentimento e controle próprios.
 
 As versões V2 e V3 permanecerão como possibilidades de evolução, contemplando, respectivamente, explicações textuais dos resultados e visualizações gráficas. Catálogos semânticos, glossários de negócio e mecanismos de recuperação de contexto poderão ser estudados posteriormente, caso as limitações observadas indiquem sua necessidade. Essas funcionalidades não serão consideradas requisitos obrigatórios para a conclusão da V1.

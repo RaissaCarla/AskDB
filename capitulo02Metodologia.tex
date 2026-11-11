@@ -9,6 +9,7 @@ A solução será desenvolvida por uma equipe composta por dois integrantes, uti
 
 
 \section{Visão Geral do Projeto}
+\label{sec:visao-geral}
 
 O projeto propõe o desenvolvimento de uma aplicação capaz de permitir consultas a bancos de dados PostgreSQL por meio de linguagem natural. O usuário deverá fornecer as informações necessárias para conexão com um banco de dados e, posteriormente, poderá formular perguntas textuais relacionadas aos dados armazenados. A aplicação será responsável por interpretar a solicitação, gerar uma consulta SQL compatível com a estrutura identificada, executá-la de maneira controlada e apresentar o resultado obtido.
 
@@ -18,23 +19,23 @@ A descoberta estrutural será realizada de maneira determinística, sem depender
 
 Além dos metadados estruturais, o sistema poderá utilizar pequenas amostras dos registros armazenados para auxiliar na compreensão do significado prático das tabelas e colunas. Como essas amostras podem conter informações sensíveis, sua utilização dependerá de consentimento explícito do usuário.
 
-Quando autorizada, a amostragem será limitada a, no máximo, cem registros por operação de amostragem por padrão, podendo ser incrementada se de acordo com o usuário. Caso o usuário não autorize o acesso aos registros, o sistema continuará funcionando exclusivamente a partir das informações estruturais obtidas durante a introspecção do banco.
+Quando autorizada, a amostragem será limitada a cem registros por tabela, abrangendo todas as colunas acessíveis à role. A autorização será concedida por tabela, com decisão separada para eventual envio a um provedor remoto. Caso o usuário não autorize amostras, o sistema continuará funcionando com os metadados estruturais e o contexto de negócio permitido.
 
 De maneira geral, a arquitetura conceitual da solução será composta pelo seguinte fluxo:
 
 \begin{center}
-Aplicação $\rightarrow$ Interface React $\rightarrow$ API/Orquestração $\rightarrow$ Descoberta e Introspecção do Banco $\rightarrow$ Preparação do Contexto $\rightarrow$ Interpretação da Solicitação $\rightarrow$ Geração Text-to-SQL $\rightarrow$ Guardrails e Validação $\rightarrow$ Execução Read-only $\rightarrow$ Processamento do Resultado $\rightarrow$ Apresentação ao Usuário.
+Interface desktop $\rightarrow$ Preparação do contexto da conexão $\rightarrow$ Geração de SQL $\rightarrow$ Validação independente $\rightarrow$ Inspeção e confirmação pelo usuário $\rightarrow$ Execução somente leitura $\rightarrow$ Resultado tabular.
 \end{center}
 
-A aplicação web será disponibilizada como software desktop, permitindo que a interface construída com tecnologias web seja executada tanto online em nuvem, quanto diretamente no computador do usuário. Essa característica será especialmente relevante em cenários nos quais o banco PostgreSQL esteja hospedado localmente ou disponível apenas na rede interna do usuário.
+A aplicação será distribuída como software desktop para Windows, com interface Electron/React e backend Python/FastAPI incluído no instalador e iniciado automaticamente. O núcleo de consulta será executado no computador do usuário, permitindo acesso a PostgreSQL local ou de rede interna. Um serviço separado em nuvem, denominado \textit{Control Plane}, atenderá cadastro, login, registro de contas e instalações e métricas básicas agregadas, sem receber perguntas, SQLs, esquemas, regras de negócio ou resultados. A política de sessão e operação offline desse serviço permanece pendente; sua indisponibilidade não deverá exigir dependência contínua da nuvem para o uso local de Ollama ou da API externa do usuário.
 
 A etapa de interpretação da solicitação também será utilizada para identificar pedidos incompatíveis com o propósito da aplicação. Solicitações que envolvam inserção, atualização, exclusão ou alteração estrutural do banco não deverão prosseguir para execução.
 
-O desenvolvimento da solução será organizado em quatro incrementos principais.
+O desenvolvimento será organizado em três marcos de entrega: demonstração de 20\%, prova de conceito V0 e MVP desktop V1. O marco de 20\%, entregue na semana de 2 a 8 de novembro de 2026, demonstrou conexão com PostgreSQL em Docker, introspecção autorizada, geração via Ollama e validação inicial, sem execução da SQL proposta. A V0 está prevista para a semana de 9 a 15 de novembro de 2026, e a V1 para o semestre seguinte.
 
-A \textbf{V0} corresponderá a uma prova de conceito, cujo objetivo será validar tecnicamente o fluxo essencial da aplicação. Nessa etapa serão avaliados principalmente a conexão com PostgreSQL, a introspecção da estrutura do banco, o recebimento de uma pergunta em linguagem natural, a geração da consulta SQL, a validação da operação e a apresentação do resultado obtido.
+A \textbf{V0} corresponderá à prova de conceito por interface de linha de comando (CLI), reutilizando o núcleo dos 20\%. Acrescentará contexto de negócio por conexão, até três tentativas totais de geração, confirmação explícita da SQL e execução controlada de leitura com apresentação tabular no terminal. A entrevista poderá ser explorada experimentalmente, sem exigir o fluxo completo da V1.
 
-A \textbf{V1} corresponderá ao Produto Mínimo Viável (MVP) e constituirá a entrega-alvo do trabalho. Nessa versão, o fluxo validado na V0 será integrado a uma interface gráfica, permitindo que o usuário configure uma conexão PostgreSQL, autorize ou não a utilização de amostras, realize perguntas e visualize os resultados em formato tabular.
+A \textbf{V1} corresponderá ao Produto Mínimo Viável (MVP) e constituirá a entrega-alvo do trabalho. Integrará o núcleo a uma interface desktop, com múltiplas conexões configuráveis, Ollama local e ao menos uma API externa do usuário, entrevista de contexto por conexão, histórico e configurações locais, proteção opcional de segredos e Control Plane básico. Os resultados serão apresentados em formato tabular.
 
 A \textbf{V2} será considerada uma evolução prevista da solução e acrescentará uma etapa de interpretação dos resultados obtidos, permitindo que o sistema apresente também uma explicação textual dos dados retornados.
 
@@ -43,7 +44,15 @@ Por fim, a \textbf{V3} representará uma evolução voltada à visualização de
 As versões V2 e V3 serão tratadas como possibilidades de evolução e não como requisitos obrigatórios para a conclusão do MVP.
 
 
+A unidade de configuração e isolamento será a conexão, incluindo o destino PostgreSQL e a identidade de acesso. Cada conexão terá um único arquivo \texttt{context.md}, com regras de negócio confirmadas pelo usuário. Na V1, a entrevista inicial poderá formular até quinze perguntas, com alternativas sugeridas e resposta livre; hipóteses não confirmadas não serão incorporadas como regras. Na V0, o arquivo poderá ser preparado manualmente.
+
+O \texttt{ContextBuilder} combinará políticas técnicas, esquema autorizado, arquivo de contexto completo, pergunta atual e pares anteriores de pergunta/SQL da mesma sessão. Não haverá RAG, embeddings ou seleção semântica de partes da memória. O orçamento inicial será de oito mil tokens para a memória de negócio e dezesseis mil para o contexto de entrada completo, respeitando a janela do modelo e a reserva de saída; excessos serão informados, sem descarte silencioso de regras. Linhas retornadas por consultas não alimentarão a LLM.
+
+Na V1, o SQLite persistirá apenas dados operacionais locais: perfil e preferências do usuário, configurações de conexões e de IA, consentimentos necessários e histórico de conversas. O conhecimento de negócio permanecerá em Markdown, e senhas e chaves salvas opcionalmente serão protegidas por Electron safeStorage/DPAPI no Windows, com referências no SQLite. Não serão replicados resultados, amostras ou o catálogo completo do PostgreSQL. Na V0, configurações e contexto poderão usar arquivos simples, sem persistência de segredos.
+
+
 \section{Requisitos}
+\label{sec:requisitos}
 
 Os requisitos de software representam os serviços que o sistema deverá oferecer, bem como as restrições que deverão ser consideradas em seu desenvolvimento. Segundo \cite{Sommerville,sommerville2007engenharia}, os requisitos podem ser classificados em funcionais, relacionados diretamente às funcionalidades e comportamentos esperados do sistema, e não funcionais, associados a restrições e propriedades de qualidade da solução.
 
@@ -57,7 +66,7 @@ Os requisitos funcionais inicialmente definidos para a aplicação são apresent
 \begin{itemize}
 
     \item \textbf{RF01 -- Conexão com banco de dados:}
-    o sistema deverá permitir que o usuário informe os dados necessários para conexão com um banco de dados PostgreSQL.
+    o sistema deverá permitir configurar e testar conexões PostgreSQL com roles preexistentes e permissões restritas, sem provisionamento administrativo; a V1 permitirá manter múltiplas configurações, com uma conexão ativa por conversa.
 
     \item \textbf{RF02 -- Identificação de esquemas:}
     o sistema deverá identificar automaticamente os esquemas acessíveis utilizando a conexão fornecida.
@@ -66,10 +75,10 @@ Os requisitos funcionais inicialmente definidos para a aplicação são apresent
     o sistema deverá identificar automaticamente tabelas, colunas, tipos de dados, chaves primárias e chaves estrangeiras existentes nas estruturas acessíveis.
 
     \item \textbf{RF04 -- Consentimento para amostragem:}
-    o sistema deverá solicitar autorização explícita do usuário antes de utilizar registros do banco como contexto enviado ao modelo de linguagem.
+    o sistema deverá solicitar autorização explícita por tabela para usar amostras, com consentimento separado para envio a um provedor remoto.
 
     \item \textbf{RF05 -- Limitação das amostras:}
-    quando a utilização de registros for autorizada, o sistema deverá limitar cada amostragem a, no máximo, dez registros.
+    quando a utilização de registros for autorizada, o sistema deverá limitar a amostragem a cem registros por tabela, incluindo todas as colunas acessíveis à role.
 
     \item \textbf{RF06 -- Entrada em linguagem natural:}
     o sistema deverá permitir que o usuário formule perguntas sobre os dados utilizando linguagem natural.
@@ -78,19 +87,32 @@ Os requisitos funcionais inicialmente definidos para a aplicação são apresent
     o sistema deverá identificar solicitações incompatíveis com o escopo exclusivamente de leitura da aplicação.
 
     \item \textbf{RF08 -- Geração de consulta SQL:}
-    o sistema deverá gerar consultas SQL de leitura a partir da pergunta realizada pelo usuário e das informações disponíveis sobre a estrutura do banco de dados.
+    o sistema deverá gerar consultas SQL de leitura a partir da pergunta, do esquema autorizado e do contexto de negócio validado da conexão ativa.
 
     \item \textbf{RF09 -- Execução da consulta:}
-    o sistema deverá executar as consultas consideradas permitidas sobre o banco PostgreSQL informado.
+    o sistema deverá apresentar a SQL validada e executá-la somente após confirmação explícita vinculada à SQL exata e à conexão. A proposta será revalidada antes da execução, em transação somente leitura, com timeout de trinta segundos e limite de linhas; alterações na SQL exigirão nova confirmação.
 
     \item \textbf{RF10 -- Apresentação do resultado:}
     o sistema deverá apresentar o resultado obtido em formato tabular por meio da interface gráfica da aplicação.
 
     \item \textbf{RF11 -- Correção automática de consultas:}
-    quando uma consulta considerada permitida apresentar falha durante sua geração ou execução, o sistema poderá realizar até três tentativas automáticas de correção.
+    quando uma consulta considerada permitida apresentar falha durante sua geração ou execução, o sistema poderá realizar até três tentativas totais de geração: uma inicial e até duas correções. Cada nova SQL será validada e, para execução, exigirá nova confirmação explícita.
 
     \item \textbf{RF12 -- Tratamento de falha:}
     caso a consulta não possa ser concluída após o limite de tentativas estabelecido, o sistema deverá encerrar a operação de maneira controlada e informar a falha ao usuário.
+
+
+    \item \textbf{RF13 -- Contexto de negócio por conexão:}
+    o sistema deverá carregar integralmente um \texttt{context.md} por conexão; na V1, uma entrevista de até quinze perguntas permitirá confirmar, corrigir ou rejeitar hipóteses antes de gravar as regras, que poderão ser revistas pelo usuário.
+
+    \item \textbf{RF14 -- Configuração de IA:}
+    a V1 deverá permitir configurar e testar perfis de Ollama local e de ao menos uma API externa com chave do próprio usuário.
+
+    \item \textbf{RF15 -- Persistência local:}
+    a V1 deverá manter histórico de conversas com perguntas, SQLs e estados de validação, além de preferências, configurações e consentimentos essenciais. Resultados tabulares não integrarão o histórico persistente por padrão.
+
+    \item \textbf{RF16 -- Conta e instalação:}
+    a V1 deverá oferecer cadastro e login e registrar conta e instalação no Control Plane, com métricas agregadas que não incluam o conteúdo das consultas ou do contexto.
 
 \end{itemize}
 
@@ -104,10 +126,10 @@ Os principais requisitos não funcionais definidos são:
 \begin{itemize}
 
     \item \textbf{RNF01 -- Segurança:}
-    o sistema deverá operar exclusivamente com consultas de leitura, impedindo operações que realizem escrita ou alteração estrutural no banco de dados.
+    o sistema deverá operar exclusivamente com consultas de leitura, bloqueando escrita e alteração estrutural por validação sintática com SQLGlot e política conservadora, combinadas com role de menor privilégio, transação somente leitura, timeout e limites de retorno. A LLM não receberá credenciais nem autoridade de execução.
 
     \item \textbf{RNF02 -- Privacidade:}
-    registros armazenados no banco somente poderão ser enviados como contexto a um provedor de inteligência artificial mediante consentimento explícito do usuário.
+    amostras somente poderão compor o contexto mediante autorização por tabela e consentimento separado para envio remoto. Resultados de consultas não serão enviados à LLM; segredos não serão incluídos em prompts ou logs.
 
     \item \textbf{RNF03 -- Independência da amostragem:}
     a recusa do usuário em disponibilizar amostras de registros não poderá impedir o funcionamento básico da aplicação, que deverá permanecer capaz de operar utilizando apenas os metadados estruturais do banco.
@@ -122,7 +144,7 @@ Os principais requisitos não funcionais definidos são:
     falhas relacionadas à conexão com o banco, comunicação com o provedor de inteligência artificial, geração da consulta ou execução do SQL deverão ser tratadas de forma controlada.
 
     \item \textbf{RNF07 -- Observabilidade:}
-    o sistema deverá registrar informações suficientes para permitir a análise de seu comportamento durante os testes, incluindo, quando aplicável, latência, erros, quantidade de tentativas e execução das consultas.
+    o sistema deverá registrar informações suficientes para permitir a análise de seu comportamento durante os testes, incluindo latência, categorias de erro, quantidade de tentativas e estado da execução, sem registrar indiscriminadamente dados pessoais, segredos ou linhas de resultado.
 
     \item \textbf{RNF08 -- Usabilidade:}
     a V1 deverá disponibilizar uma interface gráfica executável no computador do usuário, permitindo realizar o fluxo principal da aplicação sem necessidade de interação direta com código-fonte ou terminal.
@@ -158,17 +180,17 @@ Não fazem parte do escopo do MVP:
 
     \item treinamento de um modelo de linguagem próprio;
 
-    \item implantação obrigatória da aplicação em ambiente de nuvem ou disponibilização como aplicação web pública;
+    \item hospedagem do núcleo de consulta em nuvem ou disponibilização da interface como aplicação web pública; o Control Plane básico será um serviço separado da V1;
 
-    \item construção obrigatória de um catálogo semântico de negócio;
+    \item construção de catálogo semântico relacional ou banco vetorial; o arquivo de contexto validado por conexão fará parte do escopo;
 
-    \item utilização obrigatória de glossários de negócio;
+    \item compartilhamento automático de regras entre conexões, consultas federadas e atualização automática do catálogo;
 
-    \item utilização de mecanismos baseados em embeddings ou RAG como requisito da V1.
+    \item RAG, embeddings, gráficos, explicações textuais de resultados, exportações avançadas, cobrança e API intermediária paga do AskDB.
 
 \end{itemize}
 
-Catálogos semânticos, glossários e mecanismos baseados em embeddings poderão ser avaliados em evoluções posteriores caso se mostrem necessários para melhorar a compreensão de bancos de dados com estruturas ou domínios mais complexos.
+Catálogos semânticos estruturados e mecanismos de recuperação poderão ser avaliados em evoluções posteriores. Essa exclusão não abrange os termos e regras confirmados no arquivo de contexto da conexão, que integram a V0 e a V1.
 
 
 \section{Processo de Desenvolvimento de Software}
@@ -181,7 +203,7 @@ O trabalho será organizado a partir de um backlog contendo histórias de usuár
 
 Serão realizadas reuniões semanais para acompanhamento das atividades, identificação de impedimentos, revisão das prioridades e definição dos próximos itens do backlog. O Kanban será utilizado de maneira adaptada, sem a necessidade de introduzir papéis ou cerimônias que não agreguem valor ao contexto de uma equipe composta por apenas dois integrantes.
 
-O desenvolvimento seguirá os incrementos V0, V1, V2 e V3 definidos anteriormente. A V0 será utilizada principalmente para reduzir os riscos técnicos relacionados à introspecção do PostgreSQL, preparação de contexto, geração de consultas SQL e execução segura. Após a validação desse fluxo, o projeto avançará para a V1, correspondente ao MVP e à principal entrega prevista no TCC, incluindo a integração do backend com uma interface gráfica.
+O desenvolvimento partirá do marco de 20\% já entregue e seguirá para V0 e V1; V2 e V3 permanecerão como possibilidades posteriores. A V0 será utilizada principalmente para reduzir os riscos técnicos relacionados à introspecção do PostgreSQL, preparação de contexto, geração de consultas SQL e execução segura. Após a validação desse fluxo, o projeto avançará para a V1, correspondente ao MVP e à principal entrega prevista no TCC, incluindo a integração do backend com uma interface gráfica.
 
 Essa organização também se relaciona com os princípios de customização de processos, ou \textit{tailoring}, estudados durante a disciplina. A implementação gradual de um processo ou solução permite que áreas prioritárias sejam tratadas primeiro, evitando a tentativa de implantação de todos os elementos simultaneamente. No contexto deste projeto, essa ideia será aplicada por meio da divisão da solução em incrementos progressivos, nos quais cada versão adicionará novas capacidades a uma base previamente validada.
 
@@ -281,13 +303,11 @@ A escolha de um único SGBD para o MVP permitirá concentrar os esforços no des
 A aplicação não ficará limitada a um banco previamente configurado. O usuário poderá informar os dados de conexão de diferentes bancos PostgreSQL, desde que as credenciais utilizadas possuam acesso às estruturas que se deseja consultar.
 
 
-\subsection{SQLAlchemy}
+\subsection{Acesso ao PostgreSQL e Validação SQL}
 
-O SQLAlchemy será utilizado como camada de acesso ao PostgreSQL e terá papel relevante no módulo de descoberta e introspecção do banco de dados.
+O núcleo entregue nos 20\% utiliza psycopg para acessar o PostgreSQL e consultar seus metadados de maneira determinística, considerando os objetos acessíveis à role. O SQLAlchemy poderá ser empregado se necessário, mas não será uma dependência arquitetural obrigatória.
 
-Por meio de seus recursos de acesso a metadados e reflexão, será possível obter informações sobre esquemas, tabelas, colunas, tipos e relacionamentos existentes no banco, reduzindo a necessidade de utilizar um modelo de linguagem para tarefas que podem ser realizadas de maneira determinística.
-
-O driver específico utilizado na comunicação entre Python e PostgreSQL será definido durante a implementação, uma vez que sua escolha possui menor impacto sobre a arquitetura geral proposta.
+O SQLGlot será utilizado para analisar a estrutura sintática da SQL no dialeto PostgreSQL e aplicar uma política conservadora de leitura. Essa análise não comprova, isoladamente, segurança ou correção semântica: será complementada pelos privilégios do banco, pela confirmação humana e pelos limites de execução da V0 e da V1.
 
 
 \subsection{React, Vite e TypeScript}
@@ -322,9 +342,9 @@ Essa separação permitirá manter responsabilidades distintas entre interface e
 
 Os modelos de linguagem serão responsáveis pelas etapas que exigem interpretação semântica, principalmente a compreensão da solicitação do usuário e a geração das consultas SQL.
 
-A integração será realizada por meio do SDK oficial do provedor selecionado.
+A integração utilizará o contrato \texttt{LLMClientPort}, com adaptadores específicos para cada serviço e sem dependência do núcleo em relação ao SDK de um fornecedor.
 
-Inicialmente, OpenAI e DeepSeek serão considerados como possíveis provedores. A decisão final será realizada durante o desenvolvimento a partir de experimentos internos que considerem fatores como qualidade das consultas produzidas, capacidade de seguir instruções, latência e custo de utilização.
+O Ollama local já integra o núcleo dos 20\%. A V1 também oferecerá ao menos uma API externa com chave do usuário; o fornecedor remoto e os modelos definitivos serão escolhidos por testes de qualidade, latência e custo. O adaptador OpenAI representado nos diagramas é uma possibilidade de implementação, sem fechar a escolha do fornecedor.
 
 A solução será projetada de maneira a evitar acoplamento excessivo a um único modelo ou provedor, permitindo que essa escolha seja alterada sem exigir modificações significativas nas demais camadas da aplicação.
 
@@ -344,6 +364,6 @@ A execução local será adotada como estratégia principal para o MVP.
 
 Essa decisão está relacionada à característica do sistema de interagir com bancos PostgreSQL que poderão estar instalados no próprio computador do usuário ou disponíveis apenas em redes internas. Dessa forma, a execução da aplicação no ambiente do usuário reduz a necessidade de expor o banco de dados a serviços externos apenas para possibilitar a conexão.
 
-O Electron será responsável pela disponibilização da interface como aplicação desktop, enquanto o backend em Python e FastAPI será executado localmente e utilizado pela interface para realizar as operações necessárias.
+O instalador Electron incluirá o backend Python empacotado e o iniciará automaticamente, dispensando uma instalação separada de Python pelo usuário. A API local ficará restrita a 127.0.0.1, protegida por token efêmero de sessão; a interface utilizará uma ponte controlada para acesso aos segredos, sem expô-los ao renderer.
 
-Não será estabelecido como requisito do projeto que a solução esteja hospedada em ambiente de nuvem ou disponível publicamente pela Internet. A implantação em ambientes remotos poderá ser considerada futuramente, mas não será necessária para a validação da proposta apresentada neste trabalho.
+O núcleo de consulta não será hospedado publicamente. O serviço em nuvem da V1 se limitará às contas, instalações e métricas agregadas do produto, sem receber o conteúdo dos bancos ou das conversas. A política de sessão offline ainda será detalhada.

@@ -28,7 +28,7 @@ O Quadro~\ref{qua:atores} apresenta os atores que interagem com o sistema.
         \hline
         \textbf{Ator} & \textbf{Tipo} & \textbf{Descrição} \\ \hline
         Usuário & Primário & Pessoa que conhece o contexto dos dados, mas não necessariamente domina SQL. Configura a conexão, decide sobre o uso de amostras, formula perguntas e visualiza os resultados. \\ \hline
-        Provedor de IA & Secundário (externo) & Serviço de modelo de linguagem (por exemplo, OpenAI ou DeepSeek) que interpreta a solicitação e gera ou corrige a consulta SQL a partir do contexto recebido. \\ \hline
+        Provedor de IA & Secundário (externo) & Modelo local via Ollama ou serviço de API externa com chave do usuário que interpreta a solicitação e gera ou corrige a consulta SQL a partir do contexto recebido. \\ \hline
         Banco PostgreSQL & Secundário (externo) & Banco de dados do usuário, acessado com as credenciais informadas, do qual são extraídos os metadados estruturais, as amostras autorizadas e os resultados das consultas. \\ \hline
     \end{tabular}
     \legend{Fonte: Elaborado pelos autores (2026).}
@@ -43,23 +43,26 @@ As regras de negócio a seguir complementam os requisitos e delimitam o comporta
     \item \textbf{RN01 -- Somente leitura:} apenas consultas de leitura, compostas por uma única instrução \texttt{SELECT}, podem ser executadas.
     \item \textbf{RN02 -- Validação independente:} a resposta do modelo de linguagem não é tratada como confiável; toda consulta gerada passa por uma camada de validação sintática e de segurança independente do modelo antes da execução.
     \item \textbf{RN03 -- Comandos bloqueados:} comandos como \texttt{INSERT}, \texttt{UPDATE}, \texttt{DELETE}, \texttt{DROP}, \texttt{ALTER} e \texttt{TRUNCATE}, bem como quaisquer outros capazes de alterar registros ou estruturas, devem ser bloqueados antes da execução.
-    \item \textbf{RN04 -- Execução controlada:} as consultas aprovadas são executadas em modo somente leitura sobre o banco informado.
+    \item \textbf{RN04 -- Execução controlada:} a SQL validada será apresentada ao usuário e somente executada após confirmação explícita vinculada à proposta exata e à conexão, com revalidação, role restrita, transação somente leitura, timeout de trinta segundos e limite de retorno.
     \item \textbf{RN05 -- Estrutura determinística:} os metadados estruturais (esquemas, tabelas, colunas, tipos, chaves primárias e estrangeiras) são obtidos pelo módulo de introspecção, e não por inferência do modelo de linguagem.
-    \item \textbf{RN06 -- Consentimento explícito:} nenhum registro do banco é enviado ao provedor de IA sem autorização explícita do usuário.
-    \item \textbf{RN07 -- Limite de amostragem:} quando autorizada, cada amostragem contém no máximo dez registros.
-    \item \textbf{RN08 -- Limite de correções:} uma consulta permitida que falhe pode ser reenviada ao modelo para correção em até três tentativas; esgotadas as tentativas, a operação é encerrada com informação ao usuário.
+    \item \textbf{RN06 -- Consentimento explícito:} amostras exigirão autorização por tabela e consentimento separado para envio remoto. Resultados de consultas não serão enviados à LLM.
+    \item \textbf{RN07 -- Limite de amostragem:} quando autorizada, cada amostragem conterá no máximo cem registros por tabela, incluindo todas as colunas acessíveis à role.
+    \item \textbf{RN08 -- Limite de correções:} cada pergunta admitirá uma geração inicial e até duas correções, totalizando três tentativas; cada nova SQL será validada e, para execução, confirmada novamente pelo usuário.
     \item \textbf{RN09 -- Alcance definido pelas credenciais:} o sistema considera apenas as estruturas acessíveis às credenciais fornecidas pelo usuário.
     \item \textbf{RN10 -- Rastreabilidade técnica:} latência, erros, número de tentativas e execução das consultas são registrados para apoiar a avaliação do sistema.
+
+    \item \textbf{RN11 -- Contexto isolado:} cada conversa terá uma conexão ativa. Seu arquivo de contexto reunirá somente regras confirmadas, sem compartilhamento automático com outras conexões.
+    \item \textbf{RN12 -- Persistência mínima:} SQLite armazenará configurações, consentimentos e histórico de perguntas/SQLs; segredos salvos opcionalmente ficarão protegidos pelo mecanismo do Windows e resultados tabulares não serão persistidos por padrão.
 \end{itemize}
 
 \section{Casos de Uso}
 \label{ap:casos-uso}
 
-A Figura~\ref{fig:casos-uso} apresenta o diagrama de casos de uso do MVP e o Quadro~\ref{qua:casos-uso} relaciona cada caso de uso aos requisitos que ele atende.
+A Figura~\ref{fig:casos-uso} representa o fluxo central de consulta do MVP, sem pretensão de enumerar todas as funções da V1. O Quadro~\ref{qua:casos-uso} e as descrições seguintes complementam esse recorte com contexto, perfis de IA, persistência e conta do produto.
 
 \begin{figure}[htb]
     \centering
-    \caption{Diagrama de casos de uso do MVP (V1)}
+    \caption{Diagrama de casos de uso -- fluxo central do MVP (V1)}
     \label{fig:casos-uso}
     \includegraphics[width=\textwidth]{imagens/casos_de_uso.png}
     \legend{Fonte: Elaborado pelos autores (2026).}
@@ -79,6 +82,10 @@ A Figura~\ref{fig:casos-uso} apresenta o diagrama de casos de uso do MVP e o Qua
         UC06 & Executar consulta e apresentar resultado & RF09, RF10 & Banco PostgreSQL \\ \hline
         UC07 & Corrigir consulta automaticamente & RF11 & Provedor de IA \\ \hline
         UC08 & Tratar falha & RF12, RNF06 & Usuário \\ \hline
+        UC09 & Preparar contexto de negócio & RF13 & Usuário, Provedor de IA \\ \hline
+        UC10 & Configurar perfil de IA & RF14 & Usuário, Provedor de IA \\ \hline
+        UC11 & Consultar histórico e preferências & RF15 & Usuário \\ \hline
+        UC12 & Acessar conta do produto & RF16 & Usuário, Control Plane \\ \hline
     \end{tabular}
     \legend{Fonte: Elaborado pelos autores (2026).}
 \end{quadro}
@@ -94,10 +101,10 @@ A Figura~\ref{fig:casos-uso} apresenta o diagrama de casos de uso do MVP e o Qua
 
 \textbf{Fluxo principal:}
 \begin{enumerate}
-    \item O usuário informa os dados de conexão (servidor, porta, banco, usuário e senha).
+    \item O usuário informa os dados de conexão (servidor, porta, banco e credenciais de uma role preexistente de menor privilégio).
     \item O sistema tenta estabelecer a conexão.
     \item O sistema aciona a identificação da estrutura do banco (UC02).
-    \item O sistema informa que o banco está pronto para receber perguntas.
+    \item O sistema disponibiliza a estrutura da conexão e permite preparar seu contexto de negócio (UC09) e selecionar um perfil de IA (UC10). Na V1, a configuração não sensível será persistida localmente.
 \end{enumerate}
 
 \textbf{Fluxo alternativo:} se a conexão falhar (dados incorretos ou banco inacessível), o sistema informa o erro ao usuário e permite corrigir os dados (RNF06).
@@ -124,17 +131,17 @@ A Figura~\ref{fig:casos-uso} apresenta o diagrama de casos de uso do MVP e o Qua
     \item[Objetivo:] permitir que o usuário autorize ou recuse o envio de amostras de registros ao provedor de IA.
     \item[Ator:] Usuário.
     \item[Pré-condição:] estrutura do banco identificada (UC02).
-    \item[Pós-condição:] preferência de amostragem registrada para a sessão.
+    \item[Pós-condição:] decisão registrada por tabela, com consentimento separado para envio remoto; na V1, os consentimentos essenciais serão persistidos localmente.
 \end{description}
 
 \textbf{Fluxo principal:}
 \begin{enumerate}
     \item O sistema informa que as amostras podem conter dados sensíveis e solicita autorização explícita (RF04).
-    \item O usuário autoriza a utilização das amostras.
-    \item Quando necessário, o sistema coleta amostras de, no máximo, dez registros por operação (RF05) e as inclui no contexto.
+    \item O usuário autoriza a utilização de amostras da tabela e decide separadamente sobre envio a um provedor remoto.
+    \item Quando necessário, o sistema coleta amostras de, no máximo, cem registros por tabela, incluindo todas as colunas acessíveis à role (RF05) e as inclui no contexto.
 \end{enumerate}
 
-\textbf{Fluxo alternativo:} se o usuário recusar, nenhum registro é lido para composição do contexto e o sistema opera apenas com os metadados estruturais (RNF03).
+\textbf{Fluxo alternativo:} se o usuário recusar, nenhum registro é lido para composição do contexto e o sistema opera com os metadados e o contexto de negócio permitido, sem amostras (RNF03).
 
 \subsection{UC04 -- Realizar consulta em linguagem natural}
 
@@ -148,18 +155,20 @@ A Figura~\ref{fig:casos-uso} apresenta o diagrama de casos de uso do MVP e o Qua
 \textbf{Fluxo principal:}
 \begin{enumerate}
     \item O usuário digita uma pergunta em linguagem natural (RF06).
-    \item O sistema prepara o contexto com a estrutura do banco e, se autorizadas, as amostras.
+    \item O sistema prepara o contexto com o esquema autorizado, o arquivo de negócio da conexão, a pergunta e pares anteriores de pergunta/SQL da mesma sessão, respeitando os limites definidos; amostras só serão usadas quando autorizadas.
     \item O sistema verifica se a solicitação é compatível com o escopo de leitura (UC05).
     \item O sistema solicita ao provedor de IA a geração da consulta SQL (RF08).
     \item O sistema valida a consulta gerada (UC05).
-    \item O sistema executa a consulta aprovada e apresenta o resultado em tabela (UC06).
+    \item O sistema apresenta a SQL validada e solicita confirmação explícita para essa proposta e conexão.
+    \item Se confirmada, o sistema revalida, executa e apresenta o resultado em tabela (UC06).
 \end{enumerate}
 
 \textbf{Fluxos alternativos:}
 \begin{enumerate}
     \item[A1.] \emph{Solicitação incompatível:} se a pergunta exigir inserção, atualização, exclusão ou alteração estrutural, o sistema não prossegue para a execução e informa o motivo ao usuário (RF07).
     \item[A2.] \emph{Consulta reprovada na validação:} a consulta não é executada; o sistema pode solicitar nova geração dentro do limite de tentativas (UC07) ou, esgotado o limite, tratar a falha (UC08).
-    \item[A3.] \emph{Erro de geração ou execução:} o sistema aciona a correção automática (UC07).
+    \item[A3.] \emph{Erro de geração ou execução:} o sistema poderá acionar a correção dentro do limite total (UC07), sem executar automaticamente a nova SQL.
+    \item[A4.] \emph{Execução recusada:} o usuário poderá copiar a SQL ou encerrar o fluxo; nenhuma consulta será executada.
 \end{enumerate}
 
 \subsection{UC05 -- Validar solicitação e consulta}
@@ -168,20 +177,36 @@ Caso de uso incluído em UC04. O sistema verifica a intenção da pergunta (RF07
 
 \subsection{UC06 -- Executar consulta e apresentar resultado}
 
-Caso de uso incluído em UC04. O sistema executa a consulta aprovada em modo somente leitura (RF09; RN04), processa o resultado e o apresenta ao usuário em formato tabular na interface gráfica (RF10), registrando latência e demais informações de execução (RNF07).
+Caso de uso incluído em UC04. Após confirmação explícita da proposta exata e da conexão, o sistema revalida e executa a SQL com role restrita, transação somente leitura, timeout de trinta segundos e limite de linhas (RF09; RN04), processa o resultado e o apresenta ao usuário em formato tabular na interface gráfica (RF10), registrando latência e demais informações de execução (RNF07).
 
 \subsection{UC07 -- Corrigir consulta automaticamente}
 
-Caso de uso que estende UC04. Quando uma consulta permitida falha na geração ou na execução, o sistema envia o erro ao provedor de IA e obtém uma nova versão da consulta, repetindo o processo em até três tentativas (RF11; RN08). Cada tentativa é registrada para fins de avaliação (RN10).
+Caso de uso que estende UC04. Quando uma consulta permitida falha na geração ou na execução, o sistema envia o erro ao provedor de IA e obtém uma nova versão da consulta, respeitando três tentativas totais, incluindo a geração inicial (RF11; RN08). Uma nova SQL exige validação e nova confirmação antes da execução. Cada tentativa é registrada para fins de avaliação (RN10).
 
 \subsection{UC08 -- Tratar falha}
 
 Caso de uso que estende UC04. Esgotado o limite de tentativas, ou diante de falhas de conexão ou de comunicação com o provedor de IA, o sistema encerra a operação de maneira controlada e informa a falha ao usuário, sem executar consultas não aprovadas (RF12; RNF06).
 
+\subsection{UC09 -- Preparar contexto de negócio}
+
+Na V0, o usuário poderá preparar manualmente o \texttt{context.md} da conexão. Na V1, a entrevista utilizará o esquema autorizado para formular até quinze perguntas, com alternativas sugeridas, resposta livre e possibilidade de correção. Somente interpretações confirmadas serão gravadas. O usuário poderá revisar o arquivo e refazer a entrevista; o \texttt{ContextBuilder} o lerá integralmente, respeitando os limites de contexto, sem RAG ou seleção semântica (RF13; RN11).
+
+\subsection{UC10 -- Configurar perfil de IA}
+
+O usuário configurará e testará endpoint e modelo do Ollama local ou de uma API externa com chave própria. A V1 persistirá a configuração não sensível e, opcionalmente, uma referência ao segredo protegido pelo mecanismo do Windows. Os adaptadores utilizarão o mesmo contrato \texttt{LLMClientPort} (RF14; RNF05).
+
+\subsection{UC11 -- Consultar histórico e preferências}
+
+A V1 permitirá recuperar conversas, perguntas, SQLs e estados de validação, além de manter nome, preferências e configurações do usuário. O histórico ficará associado à conexão, sem armazenar resultados tabulares por padrão. Consultar o histórico não autorizará executar novamente uma SQL nem enviará automaticamente conversas antigas à LLM (RF15; RN12).
+
+\subsection{UC12 -- Acessar conta do produto}
+
+O usuário realizará cadastro e login pelo Control Plane, que registrará contas e instalações e receberá somente métricas básicas agregadas de uso. O serviço não receberá esquemas, perguntas, SQLs, arquivos de contexto ou resultados. A política de sessão e operação offline ainda será detalhada, preservando a intenção de não depender continuamente da nuvem para consultas locais (RF16).
+
 \section{Rastreabilidade dos Requisitos}
 \label{ap:rastreabilidade}
 
-O Quadro~\ref{qua:rastreabilidade} relaciona os requisitos funcionais aos casos de uso e aos incrementos em que são implementados. O fluxo essencial é validado tecnicamente na V0 e integrado à interface gráfica na V1.
+O Quadro~\ref{qua:rastreabilidade} relaciona os requisitos funcionais aos casos de uso e aos incrementos em que são implementados. O marco de 20\% já contempla descoberta, geração e validação sem execução. A V0 acrescentará contexto, correção, confirmação e execução pela CLI; a V1 integrará a interface desktop e as funções de produto. A tabela indica os marcos previstos para o atendimento completo de cada requisito.
 
 \begin{quadro}[htb]
     \caption{Rastreabilidade dos requisitos funcionais}
@@ -198,9 +223,13 @@ O Quadro~\ref{qua:rastreabilidade} relaciona os requisitos funcionais aos casos 
         RF07 & Validação da intenção & UC04, UC05 & V0 e V1 \\ \hline
         RF08 & Geração de consulta SQL & UC04 & V0 e V1 \\ \hline
         RF09 & Execução da consulta & UC06 & V0 e V1 \\ \hline
-        RF10 & Apresentação do resultado & UC06 & V0 e V1 \\ \hline
-        RF11 & Correção automática de consultas & UC07 & V1 \\ \hline
-        RF12 & Tratamento de falha & UC08 & V1 \\ \hline
+        RF10 & Resultado tabular na interface gráfica & UC06 & V1 \\ \hline
+        RF11 & Correção controlada de consultas & UC07 & V0 e V1 \\ \hline
+        RF12 & Tratamento de falha & UC08 & V0 e V1 \\ \hline
+        RF13 & Contexto por conexão; entrevista na V1 & UC09 & V0 e V1 \\ \hline
+        RF14 & Perfis de IA local e remota & UC10 & V1 \\ \hline
+        RF15 & Histórico e configurações locais & UC11 & V1 \\ \hline
+        RF16 & Conta e instalação & UC12 & V1 \\ \hline
     \end{tabular}
     \legend{Fonte: Elaborado pelos autores (2026).}
 \end{quadro}
@@ -236,87 +265,52 @@ O Quadro~\ref{qua:criterios-rnf} indica como cada requisito não funcional será
 
   \label{ap:estrutural}
 
-Este apêndice apresenta o modelo estrutural do sistema por meio de diagramas de classes da UML. Optou-se por dois diagramas complementares: o modelo de domínio, que representa as informações manipuladas pela aplicação, e o modelo de módulos do backend, que representa as classes responsáveis por cada etapa do fluxo descrito na Seção~\ref{sec:visao-geral}. Os nomes seguem a nomenclatura de implementação prevista e podem ser refinados durante o desenvolvimento.
+Este apêndice reúne duas visões complementares de classes para a V1: o núcleo de geração e validação de SQL e sua evolução com preparação de contexto e execução confirmada. Os diagramas são conceituais; orientam responsabilidades e dependências, sem exigir correspondência exaustiva com todas as classes, assinaturas ou módulos do código. Componentes previstos não devem ser interpretados como já implementados.
 
-\section{Modelo de Domínio}
-\label{ap:dominio}
+\section{Núcleo de Geração e Validação SQL}
+\label{ap:nucleo-sql}
 
-A Figura~\ref{fig:dominio} apresenta as principais classes de domínio. A estrutura do banco é obtida a partir de uma conexão e composta por esquemas, tabelas, colunas e chaves estrangeiras, obtidos de forma determinística pelo módulo de introspecção. As amostras de registros são opcionais e associadas às tabelas somente quando o usuário as autoriza. O contexto de consulta reúne a estrutura, as amostras eventuais e a pergunta, e serve de base para a geração da consulta SQL, que passa por validação e, quando aprovada, produz um resultado.
+A Figura~\ref{fig:classes-nucleo} apresenta o núcleo coordenado pelo \texttt{GenerateSqlUseCase}. A descoberta do esquema utiliza o contrato \texttt{SchemaCatalogPort}, e a geração utiliza o \texttt{LLMClientPort}. A proposta passa pelo \texttt{SqlPolicyValidator}. Essa separação permite testar o núcleo e substituir integrações sem transferir ao modelo a responsabilidade de executar SQL. O PostgreSQL e os provedores de IA são acessados por adaptadores.
 
-\begin{figure}[htb]
+A imagem recebida conserva a referência antiga \texttt{InferencePort} em um atributo. Para o escopo e a nomenclatura atuais, esse atributo corresponde a \texttt{LLMClientPort}, já identificado como interface no próprio diagrama. O adaptador OpenAI ilustra a categoria de API externa do usuário; não determina o fornecedor remoto final e não significa que essa integração esteja concluída.
+
+\begin{landscape}
+\begin{figure}[p]
     \centering
-    \caption{Diagrama de classes -- modelo de domínio}
-    \label{fig:dominio}
-    \includegraphics[width=\textwidth]{imagens/diagrama_classes_dominio.png}
+    \caption{Diagrama de classes -- núcleo de geração e validação previsto para a V1}
+    \label{fig:classes-nucleo}
+    \includegraphics[width=\linewidth,height=0.84\textwidth,keepaspectratio]{imagens/diagrama_classes_nucleo.png}
     \legend{Fonte: Elaborado pelos autores (2026).}
 \end{figure}
+\clearpage
+\end{landscape}
 
-O Quadro~\ref{qua:classes-dominio} descreve a responsabilidade de cada classe.
+\section{Contexto da Conexão e Execução Confirmada}
+\label{ap:contexto-execucao}
 
-\begin{quadro}[htb]
-    \caption{Classes do modelo de domínio}
-    \label{qua:classes-dominio}
-    \begin{tabular}{|p{3.6cm}|p{10.6cm}|}
-        \hline
-        \textbf{Classe} & \textbf{Responsabilidade} \\ \hline
-        ConexaoBanco & Dados de acesso ao PostgreSQL informados pelo usuário e sua decisão sobre o uso de amostras (RF01, RF04). A senha é mantida apenas em memória durante a sessão. \\ \hline
-        EstruturaBanco & Representação estruturada de tudo o que foi identificado na introspecção (RF02, RF03). \\ \hline
-        Esquema, Tabela, Coluna & Elementos estruturais do banco, incluindo tipo de dado, aceitação de nulos e indicação de chave primária. \\ \hline
-        ChaveEstrangeira & Relacionamento entre tabelas, usado para que a geração de SQL reconheça junções possíveis. \\ \hline
-        AmostraRegistros & Conjunto opcional de registros, limitado a dez por amostragem (RF05), incluído no contexto somente com consentimento. \\ \hline
-        Pergunta & Solicitação em linguagem natural formulada pelo usuário (RF06). \\ \hline
-        ContextoConsulta & Contexto enviado ao provedor de IA, composto pela estrutura, pelas amostras (se houver) e pela pergunta. \\ \hline
-        ConsultaSQL & Consulta gerada pelo modelo, com indicação do número da tentativa, de modo a controlar as correções (RF11). \\ \hline
-        ResultadoValidacao & Resultado da análise de segurança: consulta aprovada ou bloqueada, com o motivo (RF07, RNF01). \\ \hline
-        ResultadoConsulta & Colunas, linhas e latência da consulta executada (RF09, RF10). \\ \hline
-        RegistroExecucao & Informações de observabilidade de cada solicitação: estado final, tentativas, latência e, quando disponíveis, tokens e custo estimado (RNF07). \\ \hline
-    \end{tabular}
-    \legend{Fonte: Elaborado pelos autores (2026).}
-\end{quadro}
+A Figura~\ref{fig:classes-contexto} amplia o núcleo para a V1. O \texttt{ContextBuilder} reúne esquema autorizado, conhecimento validado do arquivo da conexão, pergunta e pares anteriores de pergunta/SQL da mesma sessão. O \texttt{KnowledgeFilePort} e seu adaptador Markdown representam o acesso ao \texttt{context.md}; o \texttt{TokenBudgetPolicy} verifica os limites de entrada. O diagrama não detalha todas as classes da entrevista: sua responsabilidade é obter confirmação humana antes de atualizar o arquivo.
 
-\section{Modelo de Módulos do Backend}
-\label{ap:modulos}
+Geração e execução permanecem separadas. O \texttt{PendingSqlRegistry} guarda temporariamente a proposta, e o \texttt{ExecuteSqlUseCase} somente utiliza uma aprovação vinculada à SQL exata e à conexão. Antes de chamar o \texttt{ReadOnlyQueryPort}, revalida a proposta; o adaptador PostgreSQL aplica a execução restrita. Uma proposta pendente não equivale a histórico persistente nem dispensa confirmação humana.
 
-A Figura~\ref{fig:servicos} apresenta as classes de serviço do backend em Python e FastAPI. Cada uma concentra uma etapa do fluxo, atendendo ao requisito de modularidade (RNF04). O \texttt{OrquestradorConsulta} coordena a sequência de etapas e é o único componente que conhece a ordem do fluxo. A comunicação com o provedor de inteligência artificial ocorre exclusivamente por meio da interface \texttt{ProvedorLLM}, implementada por classes específicas de cada provedor, o que permite a substituição do modelo sem alterar as demais classes (RNF05).
-
-\begin{figure}[htb]
+\begin{landscape}
+\begin{figure}[p]
     \centering
-    \caption{Diagrama de classes -- módulos do backend}
-    \label{fig:servicos}
-    \includegraphics[width=\textwidth]{imagens/diagrama_classes_servicos.png}
+    \caption{Diagrama de classes -- contexto por conexão e execução prevista para a V1}
+    \label{fig:classes-contexto}
+    \includegraphics[width=\linewidth,height=0.84\textwidth,keepaspectratio]{imagens/diagrama_classes_contexto_v1.png}
     \legend{Fonte: Elaborado pelos autores (2026).}
 \end{figure}
-
-\begin{quadro}[htb]
-    \caption{Classes de serviço do backend}
-    \label{qua:classes-servicos}
-    \begin{tabular}{|p{4.0cm}|p{10.2cm}|}
-        \hline
-        \textbf{Classe} & \textbf{Responsabilidade} \\ \hline
-        OrquestradorConsulta & Coordena o fluxo completo, do recebimento da pergunta à entrega do resultado, incluindo o controle do limite de tentativas de correção. \\ \hline
-        IntrospectorBanco & Módulo de descoberta (\textit{crawler}): lista esquemas, extrai a estrutura e, quando autorizado, coleta as amostras. \\ \hline
-        PreparadorContexto & Monta o contexto enviado ao modelo a partir da estrutura, das amostras e da pergunta. \\ \hline
-        InterpretadorSolicitacao & Identifica solicitações incompatíveis com o escopo de leitura (RF07). \\ \hline
-        GeradorSQL & Gera a consulta SQL e, em caso de erro, solicita sua correção (RF08, RF11). \\ \hline
-        ProvedorLLM (interface) & Contrato de comunicação com o modelo de linguagem, implementado por ProvedorOpenAI e ProvedorDeepSeek. \\ \hline
-        ValidadorSQL & Camada de guardrails independente do modelo: aprova apenas consultas de leitura e bloqueia as demais (RNF01). \\ \hline
-        ExecutorReadOnly & Executa a consulta aprovada em modo somente leitura (RF09). \\ \hline
-        ProcessadorResultado & Converte o resultado para o formato entregue à interface (RF10). \\ \hline
-        RegistradorExecucao & Registra latência, erros, tentativas e execuções (RNF07). \\ \hline
-    \end{tabular}
-    \legend{Fonte: Elaborado pelos autores (2026).}
-\end{quadro}
+\clearpage
+\end{landscape}
 
 \section{Considerações sobre o Modelo}
 \label{ap:consideracoes-modelo}
 
-As classes de domínio serão implementadas como modelos Pydantic, que definem contratos explícitos de entrada e saída da API e validam os dados trocados entre a interface e o backend. O acesso ao PostgreSQL e a introspecção utilizarão o SQLAlchemy. Diagramas complementares de comportamento, arquitetura e dados são apresentados nos apêndices seguintes.
+O backend seguirá uma arquitetura hexagonal pragmática: contratos nas fronteiras com PostgreSQL, IA e arquivos, organizados em um único backend modular. Pydantic definirá contratos de dados e SQLGlot apoiará a validação estrutural; nenhuma dessas ferramentas substituirá os privilégios do PostgreSQL ou a confirmação do usuário. O núcleo dos 20\% já utiliza psycopg; SQLAlchemy poderá ser adotado se necessário, sem constituir obrigação da arquitetura.
 
-	
-	
-	
-	% ----------------------------------------------------------
-	\chapter{Modelo Comportamental do Sistema}
+As classes de catálogo, contexto, proposta e resultado não serão automaticamente convertidas em tabelas SQLite. A persistência da V1 é um recorte próprio, apresentado no modelo de dados, e não uma réplica do banco consultado nem de todas as classes da aplicação.
+
+\chapter{Modelo Comportamental do Sistema}
 	% ----------------------------------------------------------
    
     Texto de apresentação do Apêndice - Fluxograma ou Diagrama de Sequência ou Diagrama de Estados..
@@ -334,7 +328,31 @@ As classes de domínio serão implementadas como modelos Pydantic, que definem c
 	\chapter{Modelo de Dados do Sistema}
 	% ----------------------------------------------------------
 	
-    Texto de apresentação do Apêndice - Modelo Entidade-Relacionamento e Diagrama Entidade-Relacionamento.
+\label{ap:dados}
+
+O modelo entidade-relacionamento proposto para a V1 contempla apenas a persistência operacional do aplicativo no SQLite local. O histórico persistente, anteriormente em aberto, passa a integrar o escopo para permitir recuperar conversas e evitar reconfigurações. O modelo é um planejamento de implementação, não uma descrição de tabelas já existentes.
+
+A Figura~\ref{fig:der-sqlite} apresenta seis entidades. \texttt{PerfilUsuario} mantém o nome e as preferências locais, sem reproduzir a autenticação do Control Plane. \texttt{Conexao} guarda o destino PostgreSQL, a identidade de acesso e o caminho do arquivo de contexto. \texttt{PerfilLLM} mantém provedor, endpoint e modelo. \texttt{Conversa} associa cada histórico a uma única conexão e ao perfil de IA selecionado; \texttt{Mensagem} registra a sequência de perguntas e propostas SQL, com estado de validação. \texttt{ConsentimentoAmostra} mantém somente decisões por tabela, sem armazenar os registros amostrados.
+
+\begin{figure}[p]
+    \centering
+    \caption{DER proposto para a persistência local SQLite da V1}
+    \label{fig:der-sqlite}
+    \includegraphics[width=\textwidth,height=0.84\textheight,keepaspectratio]{imagens/der_sqlite_v1.pdf}
+    \legend{Fonte: Elaborado pelos autores (2026).}
+\end{figure}
+\clearpage
+
+As relações indicam que um perfil local pode manter várias conexões e configurações de IA; cada conexão pode ter várias conversas e consentimentos. Cada conversa utiliza uma conexão e um perfil de IA, e pode conter várias mensagens ordenadas. A associação de conexão não muda durante a conversa. Mudanças de perfil de IA poderão iniciar outra conversa, preservando a identificação do perfil empregado no histórico. Essa organização não pressupõe gestão multiusuário ou permissões comerciais locais.
+
+Os campos \texttt{senha\_ref} e \texttt{segredo\_ref} serão opcionais e conterão apenas identificadores do material protegido pelo Electron safeStorage/DPAPI, separado dos dados operacionais; senhas PostgreSQL e chaves de API não serão gravadas em texto puro no SQLite ou no Markdown. O nome do usuário local não se confunde com a role PostgreSQL nem com as credenciais da conta do produto.
+
+Os consentimentos terão uma combinação única de conexão, esquema e tabela. Autorizar envio remoto dependerá também da autorização de amostragem; a recusa será o padrão na ausência de decisão. Apenas os identificadores necessários a essa decisão serão persistidos, sem modelar tabelas, colunas ou relações completas do catálogo consultado.
+
+As mensagens persistirão perguntas, propostas SQL e estados de validação, sem linhas de resultados, amostras ou segredos. Recuperar uma conversa não significará reenviar automaticamente seu conteúdo à LLM, nem reaproveitar uma aprovação de execução anterior. A continuidade do contexto utilizará apenas pares de pergunta/SQL da sessão ativa, conforme a política de contexto; retenção e exclusão do histórico ainda serão detalhadas.
+
+O conhecimento de negócio permanecerá em um \texttt{context.md} por conexão, e o catálogo será obtido por introspecção do PostgreSQL. Contas, instalações e métricas agregadas pertencem ao serviço em nuvem e não ampliam este DER local. O arquivo Mermaid que acompanha a figura permite revisar a modelagem durante a implementação.
+
 
     % ----------------------------------------------------------
 	\chapter{Outro Apêndice}

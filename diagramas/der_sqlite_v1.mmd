@@ -1,0 +1,61 @@
+%% Modelo proposto para a V1; não representa banco implementado.
+erDiagram
+    direction TB
+    PerfilUsuario ||--o{ Conexao : configura
+    PerfilUsuario ||--o{ PerfilLLM : configura
+    Conexao ||--o{ Conversa : isola
+    PerfilLLM ||--o{ Conversa : orienta
+    Conexao ||--o{ ConsentimentoAmostra : delimita
+    Conversa ||--o{ Mensagem : contem
+    PerfilUsuario {
+        TEXT id PK
+        TEXT nome
+        TEXT idioma
+        TEXT preferencias_json
+    }
+    PerfilLLM {
+        TEXT id PK
+        TEXT usuario_id FK
+        TEXT rotulo
+        TEXT provedor
+        TEXT endpoint
+        TEXT modelo
+        TEXT segredo_ref "opcional"
+    }
+    Conexao {
+        TEXT id PK
+        TEXT usuario_id FK
+        TEXT rotulo
+        TEXT host
+        INTEGER porta
+        TEXT banco
+        TEXT usuario_pg
+        TEXT senha_ref "opcional"
+        TEXT contexto_path
+    }
+    Conversa {
+        TEXT id PK
+        TEXT conexao_id FK
+        TEXT perfil_llm_id FK
+        TEXT titulo
+        TEXT criada_em
+    }
+    ConsentimentoAmostra {
+        TEXT id PK
+        TEXT conexao_id FK
+        TEXT esquema
+        TEXT tabela
+        INTEGER autoriza_amostra "0/1"
+        INTEGER autoriza_envio_remoto "0/1"
+        TEXT atualizado_em
+    }
+    Mensagem {
+        TEXT id PK
+        TEXT conversa_id FK
+        INTEGER sequencia
+        TEXT papel
+        TEXT conteudo
+        TEXT sql_proposta "opcional"
+        TEXT estado_validacao "opcional"
+        TEXT criada_em
+    }
