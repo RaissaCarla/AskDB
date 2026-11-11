@@ -1,0 +1,42 @@
+\chapter{Introdução} \label{cap:01}
+
+O acesso rápido a informações confiáveis é importante para o acompanhamento de processos e para a tomada de decisões nas organizações. Entretanto, os dados corporativos costumam estar armazenados em bancos de dados relacionais cuja consulta exige conhecimento de linguagens específicas, como a Structured Query Language (SQL). Em consequência, colaboradores que conhecem o contexto do negócio, mas não dominam SQL, frequentemente dependem de profissionais de Tecnologia da Informação (TI) para obter relatórios e responder a perguntas operacionais. Essa dependência pode aumentar o tempo necessário para acessar informações e direcionar a equipe técnica a solicitações repetitivas de extração de dados.
+
+Os avanços em Inteligência Artificial (IA), especialmente no Processamento de Linguagem Natural (PLN), ampliaram as possibilidades de interação entre pessoas e sistemas computacionais. Nesse contexto, a área denominada \textit{text-to-SQL} investiga métodos capazes de interpretar uma pergunta formulada em linguagem natural e transformá-la em uma consulta SQL compatível com a estrutura de um banco de dados \cite{deng2022recent}. Essa abordagem pode tornar a consulta de dados mais acessível, mas ainda envolve desafios relacionados à compreensão da intenção do usuário, à associação entre os termos da pergunta e o esquema do banco, à correção da consulta produzida e à generalização para diferentes estruturas de dados \cite{yu2018spider}.
+
+Este trabalho tem como tema a aplicação de IA na consulta a bancos de dados e delimita-se ao desenvolvimento de uma plataforma web para bancos de dados relacionais. Por meio da plataforma, o usuário poderá formular, em português e sem escrever SQL, perguntas como ``Quais foram os cinco produtos mais vendidos em julho?''. A aplicação enviará a pergunta e as informações necessárias sobre o esquema do banco a um modelo de IA, receberá uma consulta SQL, verificará sua sintaxe e sua segurança, executará apenas consultas de leitura autorizadas e apresentará o resultado de forma compreensível.
+
+O problema que orienta o projeto pode ser expresso pela seguinte questão: como permitir que usuários sem conhecimento técnico em SQL consultem dados relacionais por meio de linguagem natural, preservando a segurança, a integridade e o controle de acesso às informações? Para responder a essa questão, a solução proposta combinará geração de SQL por IA com uma camada de validação independente da resposta do modelo. Serão aceitas exclusivamente consultas do tipo \texttt{SELECT}, e comandos capazes de alterar estruturas ou registros, como \texttt{INSERT}, \texttt{UPDATE}, \texttt{DELETE}, \texttt{DROP}, \texttt{ALTER} e \texttt{TRUNCATE}, deverão ser bloqueados antes da execução.
+
+O protótipo contemplará autenticação, perfis de acesso, cadastro controlado de conexões, histórico de consultas e apresentação dos resultados em tabelas e, quando pertinente, em gráficos. Também poderá explicar em linguagem natural a consulta gerada, sugerir perguntas com base no esquema disponível, permitir o reaproveitamento de consultas frequentes e exportar resultados. A interface será desenvolvida com tecnologias web, enquanto o \textit{back-end} será implementado majoritariamente em Python, com FastAPI ou Flask, a ser definido após avaliação técnica. O sistema será avaliado em cenários controlados e com bancos de dados de teste, não se propondo, nesta etapa, a substituir ferramentas completas de inteligência de negócios nem a permitir alterações nos dados consultados.
+
+\section{Justificativa}
+
+Sob a perspectiva teórica, o projeto se justifica pela relevância do problema \textit{text-to-SQL} para as áreas de PLN e bancos de dados. A tradução de uma pergunta para SQL não corresponde apenas à substituição de palavras: o sistema precisa identificar a intenção expressa, relacionar entidades e atributos ao esquema disponível e construir uma consulta sintática e semanticamente adequada. A literatura apresenta avanços importantes nessa área, mas também reconhece desafios de interpretação, geração e avaliação das consultas \cite{deng2022recent}. O conjunto de dados Spider, por exemplo, foi elaborado para avaliar consultas complexas e a generalização entre diferentes domínios e esquemas de bancos de dados, evidenciando a necessidade de soluções que sejam testadas além de exemplos simples ou de uma única base \cite{yu2018spider}.
+
+Em termos acadêmicos, o desenvolvimento da plataforma possibilita integrar conhecimentos de engenharia de software, bancos de dados, segurança da informação, desenvolvimento web e IA em um problema aplicado. Além de construir um protótipo funcional, o trabalho permitirá observar em quais tipos de pergunta a geração automática produz resultados corretos, quais erros ocorrem com maior frequência e em que medida as verificações implementadas impedem consultas inadequadas. Assim, a avaliação do sistema poderá produzir evidências sobre as possibilidades e as limitações do uso de modelos de IA como interface para dados relacionais.
+
+Sob a perspectiva prática e de mercado, a solução busca aproximar os dados dos profissionais que precisam utilizá-los, mas que não possuem formação técnica em SQL. Ao permitir consultas em linguagem cotidiana, a plataforma poderá reduzir o tempo gasto em solicitações simples de relatórios, dar maior autonomia aos usuários e liberar a equipe de TI para atividades de maior complexidade. A apresentação em tabelas, gráficos e explicações em português também poderá facilitar a interpretação dos resultados e ampliar o uso das informações disponíveis no processo decisório.
+
+Por fim, a adoção de IA nesse contexto exige cuidados específicos, pois uma consulta incorreta pode apresentar resultados enganosos, consumir recursos excessivos ou afetar informações sensíveis. Por esse motivo, a proposta não tratará a resposta do modelo como uma instrução automaticamente confiável. A restrição a operações de leitura, a validação prévia do SQL, o controle de permissões, o registro do histórico e o uso de bancos de teste constituem partes centrais da solução. Dessa maneira, o projeto procura conciliar facilidade de uso e inovação com mecanismos objetivos de segurança e rastreabilidade.
+
+\section{Objetivos}
+
+\subsection{Objetivo Geral}
+
+Desenvolver e avaliar um protótipo de plataforma web que permita a usuários sem domínio de SQL consultar bancos de dados relacionais por meio de perguntas em linguagem natural, utilizando IA para gerar consultas de leitura, validando-as antes da execução e apresentando os resultados de maneira segura e compreensível.
+
+\subsection{Objetivos Específicos}
+
+\begin{itemize}
+    \item Revisar conceitos, técnicas e trabalhos relacionados a PLN, modelos de IA e conversão de linguagem natural para SQL;
+    \item Definir a arquitetura da plataforma e o fluxo de comunicação entre interface web, \textit{back-end}, modelo de IA e banco de dados;
+    \item Desenvolver uma interface web intuitiva para o envio de perguntas e a visualização das respostas, considerando usuários sem conhecimento técnico em SQL;
+    \item Implementar o \textit{back-end} majoritariamente em Python, adotando FastAPI ou Flask conforme os critérios técnicos definidos durante o projeto;
+    \item Integrar um modelo de IA capaz de interpretar perguntas em português e gerar consultas SQL compatíveis com o esquema do banco conectado;
+    \item Implementar uma camada independente de validação sintática e de segurança que autorize somente consultas de leitura e bloqueie comandos de alteração de dados ou de estrutura;
+    \item Implementar autenticação, perfis de acesso, controle de permissões e registro do histórico das consultas realizadas;
+    \item Apresentar os resultados em tabelas e, quando adequado, em gráficos, acompanhados de uma explicação em linguagem natural sobre a consulta executada;
+    \item Disponibilizar recursos complementares previstos no escopo, como sugestões de perguntas, consultas favoritas, exportação de resultados e tentativa controlada de correção de consultas com erro; e
+    \item Avaliar o protótipo em bancos de dados de teste, considerando a correção das consultas geradas, a efetividade das regras de segurança, o tempo de execução e a compreensão dos resultados apresentados.
+\end{itemize}

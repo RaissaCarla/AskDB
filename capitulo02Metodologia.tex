@@ -1,0 +1,349 @@
+\chapter{Método de Desenvolvimento}
+\label{cap:02}
+
+Este capítulo apresenta o método de desenvolvimento adotado para a construção do sistema proposto, contemplando a visão geral da solução, seus requisitos funcionais e não funcionais, o processo de desenvolvimento de software e as principais tecnologias previstas.
+
+O projeto será conduzido de maneira incremental, priorizando inicialmente a validação do fluxo central da solução: identificação automática da estrutura de um banco de dados PostgreSQL, interpretação de uma pergunta formulada em linguagem natural, geração de uma consulta SQL segura, execução da consulta e apresentação do resultado ao usuário. A partir dessa base, funcionalidades adicionais poderão ser incorporadas progressivamente.
+
+A solução será desenvolvida por uma equipe composta por dois integrantes, utilizando um processo baseado em Kanban e adaptado às características e à escala do projeto acadêmico. O desenvolvimento será acompanhado por meio de um backlog, histórias de usuário, reuniões periódicas e validações progressivas dos incrementos produzidos.
+
+
+\section{Visão Geral do Projeto}
+
+O projeto propõe o desenvolvimento de uma aplicação capaz de permitir consultas a bancos de dados PostgreSQL por meio de linguagem natural. O usuário deverá fornecer as informações necessárias para conexão com um banco de dados e, posteriormente, poderá formular perguntas textuais relacionadas aos dados armazenados. A aplicação será responsável por interpretar a solicitação, gerar uma consulta SQL compatível com a estrutura identificada, executá-la de maneira controlada e apresentar o resultado obtido.
+
+Um dos principais componentes da solução será o módulo de descoberta e introspecção do banco de dados, denominado internamente como \textit{crawler}. Esse módulo realizará automaticamente o levantamento da estrutura acessível por meio da conexão fornecida pelo usuário, percorrendo os esquemas disponíveis e identificando, no mínimo, tabelas, colunas, tipos de dados, chaves primárias e chaves estrangeiras.
+
+A descoberta estrutural será realizada de maneira determinística, sem depender diretamente de um modelo de linguagem para identificar os elementos básicos do banco de dados. As informações encontradas serão organizadas em uma representação estruturada e posteriormente utilizadas como contexto pelas etapas responsáveis pela interpretação da solicitação e pela geração da consulta SQL.
+
+Além dos metadados estruturais, o sistema poderá utilizar pequenas amostras dos registros armazenados para auxiliar na compreensão do significado prático das tabelas e colunas. Como essas amostras podem conter informações sensíveis, sua utilização dependerá de consentimento explícito do usuário.
+
+Quando autorizada, a amostragem será limitada a, no máximo, cem registros por operação de amostragem por padrão, podendo ser incrementada se de acordo com o usuário. Caso o usuário não autorize o acesso aos registros, o sistema continuará funcionando exclusivamente a partir das informações estruturais obtidas durante a introspecção do banco.
+
+De maneira geral, a arquitetura conceitual da solução será composta pelo seguinte fluxo:
+
+\begin{center}
+Aplicação $\rightarrow$ Interface React $\rightarrow$ API/Orquestração $\rightarrow$ Descoberta e Introspecção do Banco $\rightarrow$ Preparação do Contexto $\rightarrow$ Interpretação da Solicitação $\rightarrow$ Geração Text-to-SQL $\rightarrow$ Guardrails e Validação $\rightarrow$ Execução Read-only $\rightarrow$ Processamento do Resultado $\rightarrow$ Apresentação ao Usuário.
+\end{center}
+
+A aplicação web será disponibilizada como software desktop, permitindo que a interface construída com tecnologias web seja executada tanto online em nuvem, quanto diretamente no computador do usuário. Essa característica será especialmente relevante em cenários nos quais o banco PostgreSQL esteja hospedado localmente ou disponível apenas na rede interna do usuário.
+
+A etapa de interpretação da solicitação também será utilizada para identificar pedidos incompatíveis com o propósito da aplicação. Solicitações que envolvam inserção, atualização, exclusão ou alteração estrutural do banco não deverão prosseguir para execução.
+
+O desenvolvimento da solução será organizado em quatro incrementos principais.
+
+A \textbf{V0} corresponderá a uma prova de conceito, cujo objetivo será validar tecnicamente o fluxo essencial da aplicação. Nessa etapa serão avaliados principalmente a conexão com PostgreSQL, a introspecção da estrutura do banco, o recebimento de uma pergunta em linguagem natural, a geração da consulta SQL, a validação da operação e a apresentação do resultado obtido.
+
+A \textbf{V1} corresponderá ao Produto Mínimo Viável (MVP) e constituirá a entrega-alvo do trabalho. Nessa versão, o fluxo validado na V0 será integrado a uma interface gráfica, permitindo que o usuário configure uma conexão PostgreSQL, autorize ou não a utilização de amostras, realize perguntas e visualize os resultados em formato tabular.
+
+A \textbf{V2} será considerada uma evolução prevista da solução e acrescentará uma etapa de interpretação dos resultados obtidos, permitindo que o sistema apresente também uma explicação textual dos dados retornados.
+
+Por fim, a \textbf{V3} representará uma evolução voltada à visualização de dados. Nessa etapa, o sistema poderá sugerir formas adequadas de representação gráfica dos resultados, enquanto a interface será responsável pela renderização dessas visualizações.
+
+As versões V2 e V3 serão tratadas como possibilidades de evolução e não como requisitos obrigatórios para a conclusão do MVP.
+
+
+\section{Requisitos}
+
+Os requisitos de software representam os serviços que o sistema deverá oferecer, bem como as restrições que deverão ser consideradas em seu desenvolvimento. Segundo \cite{Sommerville,sommerville2007engenharia}, os requisitos podem ser classificados em funcionais, relacionados diretamente às funcionalidades e comportamentos esperados do sistema, e não funcionais, associados a restrições e propriedades de qualidade da solução.
+
+Além desses requisitos, também será explicitado o não escopo do projeto, delimitando funcionalidades que não serão consideradas parte da entrega prevista. A definição dessas fronteiras contribui para o controle da complexidade e para a manutenção dos objetivos estabelecidos para o projeto \cite{Pressman}.
+
+
+\subsection{Requisitos Funcionais}
+
+Os requisitos funcionais inicialmente definidos para a aplicação são apresentados a seguir:
+
+\begin{itemize}
+
+    \item \textbf{RF01 -- Conexão com banco de dados:}
+    o sistema deverá permitir que o usuário informe os dados necessários para conexão com um banco de dados PostgreSQL.
+
+    \item \textbf{RF02 -- Identificação de esquemas:}
+    o sistema deverá identificar automaticamente os esquemas acessíveis utilizando a conexão fornecida.
+
+    \item \textbf{RF03 -- Introspecção estrutural:}
+    o sistema deverá identificar automaticamente tabelas, colunas, tipos de dados, chaves primárias e chaves estrangeiras existentes nas estruturas acessíveis.
+
+    \item \textbf{RF04 -- Consentimento para amostragem:}
+    o sistema deverá solicitar autorização explícita do usuário antes de utilizar registros do banco como contexto enviado ao modelo de linguagem.
+
+    \item \textbf{RF05 -- Limitação das amostras:}
+    quando a utilização de registros for autorizada, o sistema deverá limitar cada amostragem a, no máximo, dez registros.
+
+    \item \textbf{RF06 -- Entrada em linguagem natural:}
+    o sistema deverá permitir que o usuário formule perguntas sobre os dados utilizando linguagem natural.
+
+    \item \textbf{RF07 -- Validação da intenção:}
+    o sistema deverá identificar solicitações incompatíveis com o escopo exclusivamente de leitura da aplicação.
+
+    \item \textbf{RF08 -- Geração de consulta SQL:}
+    o sistema deverá gerar consultas SQL de leitura a partir da pergunta realizada pelo usuário e das informações disponíveis sobre a estrutura do banco de dados.
+
+    \item \textbf{RF09 -- Execução da consulta:}
+    o sistema deverá executar as consultas consideradas permitidas sobre o banco PostgreSQL informado.
+
+    \item \textbf{RF10 -- Apresentação do resultado:}
+    o sistema deverá apresentar o resultado obtido em formato tabular por meio da interface gráfica da aplicação.
+
+    \item \textbf{RF11 -- Correção automática de consultas:}
+    quando uma consulta considerada permitida apresentar falha durante sua geração ou execução, o sistema poderá realizar até três tentativas automáticas de correção.
+
+    \item \textbf{RF12 -- Tratamento de falha:}
+    caso a consulta não possa ser concluída após o limite de tentativas estabelecido, o sistema deverá encerrar a operação de maneira controlada e informar a falha ao usuário.
+
+\end{itemize}
+
+Como requisitos evolutivos, posteriores ao MVP, estarão previstos a geração de explicações textuais sobre os resultados na V2 e a geração ou sugestão de visualizações gráficas na V3.
+
+
+\subsection{Requisitos Não Funcionais}
+
+Os principais requisitos não funcionais definidos são:
+
+\begin{itemize}
+
+    \item \textbf{RNF01 -- Segurança:}
+    o sistema deverá operar exclusivamente com consultas de leitura, impedindo operações que realizem escrita ou alteração estrutural no banco de dados.
+
+    \item \textbf{RNF02 -- Privacidade:}
+    registros armazenados no banco somente poderão ser enviados como contexto a um provedor de inteligência artificial mediante consentimento explícito do usuário.
+
+    \item \textbf{RNF03 -- Independência da amostragem:}
+    a recusa do usuário em disponibilizar amostras de registros não poderá impedir o funcionamento básico da aplicação, que deverá permanecer capaz de operar utilizando apenas os metadados estruturais do banco.
+
+    \item \textbf{RNF04 -- Modularidade:}
+    a arquitetura deverá manter separadas as responsabilidades relacionadas à introspecção do banco, preparação de contexto, geração de SQL, validação, execução e apresentação dos resultados.
+
+    \item \textbf{RNF05 -- Baixo acoplamento ao modelo de linguagem:}
+    a integração com inteligência artificial deverá ser projetada de maneira que permita a substituição do modelo ou do provedor sem exigir a reestruturação completa da aplicação.
+
+    \item \textbf{RNF06 -- Tratamento de erros:}
+    falhas relacionadas à conexão com o banco, comunicação com o provedor de inteligência artificial, geração da consulta ou execução do SQL deverão ser tratadas de forma controlada.
+
+    \item \textbf{RNF07 -- Observabilidade:}
+    o sistema deverá registrar informações suficientes para permitir a análise de seu comportamento durante os testes, incluindo, quando aplicável, latência, erros, quantidade de tentativas e execução das consultas.
+
+    \item \textbf{RNF08 -- Usabilidade:}
+    a V1 deverá disponibilizar uma interface gráfica executável no computador do usuário, permitindo realizar o fluxo principal da aplicação sem necessidade de interação direta com código-fonte ou terminal.
+
+\end{itemize}
+
+Durante a validação da aplicação também serão consideradas métricas relacionadas ao comportamento operacional do sistema. Entre elas estarão a latência entre a solicitação e a resposta, a ocorrência de erros, o volume de consultas processadas e possíveis limitações de recursos.
+
+Devido ao caráter local e à baixa concorrência esperada para o MVP, as métricas de latência e erros possuirão maior relevância inicial. Também serão avaliadas métricas específicas relacionadas à qualidade da solução, tais como taxa de respostas corretas, taxa de execução SQL bem-sucedida, taxa de bloqueio correto de operações proibidas, quantidade de consultas que necessitaram de novas tentativas e número médio de tentativas realizadas.
+
+
+\subsection{Não Escopo}
+
+Com o objetivo de manter o desenvolvimento compatível com o tempo, tamanho da equipe e objetivos acadêmicos do projeto, algumas funcionalidades serão explicitamente excluídas do escopo obrigatório.
+
+Não fazem parte do escopo do MVP:
+
+\begin{itemize}
+
+    \item inserção de novos registros no banco de dados;
+
+    \item atualização de registros existentes;
+
+    \item exclusão de registros;
+
+    \item criação, alteração ou remoção de tabelas, esquemas ou demais objetos estruturais;
+
+    \item suporte obrigatório a sistemas gerenciadores de bancos de dados diferentes do PostgreSQL;
+
+    \item suporte inicial a bancos de dados NoSQL;
+
+    \item criação de dashboards completos;
+
+    \item treinamento de um modelo de linguagem próprio;
+
+    \item implantação obrigatória da aplicação em ambiente de nuvem ou disponibilização como aplicação web pública;
+
+    \item construção obrigatória de um catálogo semântico de negócio;
+
+    \item utilização obrigatória de glossários de negócio;
+
+    \item utilização de mecanismos baseados em embeddings ou RAG como requisito da V1.
+
+\end{itemize}
+
+Catálogos semânticos, glossários e mecanismos baseados em embeddings poderão ser avaliados em evoluções posteriores caso se mostrem necessários para melhorar a compreensão de bancos de dados com estruturas ou domínios mais complexos.
+
+
+\section{Processo de Desenvolvimento de Software}
+
+O desenvolvimento da aplicação será realizado utilizando uma abordagem incremental e iterativa, apoiada por um processo baseado em Kanban e adaptado ao tamanho reduzido da equipe e às características acadêmicas do projeto.
+
+A equipe será composta por dois integrantes. Dessa forma, optou-se por um processo com baixa sobrecarga de gestão e documentação, privilegiando visibilidade das atividades, priorização contínua e execução progressiva das funcionalidades.
+
+O trabalho será organizado a partir de um backlog contendo histórias de usuário, atividades técnicas, correções e demais tarefas necessárias para o desenvolvimento. Os itens serão priorizados conforme sua relevância para o funcionamento da solução e serão selecionados de acordo com a capacidade disponível da equipe.
+
+Serão realizadas reuniões semanais para acompanhamento das atividades, identificação de impedimentos, revisão das prioridades e definição dos próximos itens do backlog. O Kanban será utilizado de maneira adaptada, sem a necessidade de introduzir papéis ou cerimônias que não agreguem valor ao contexto de uma equipe composta por apenas dois integrantes.
+
+O desenvolvimento seguirá os incrementos V0, V1, V2 e V3 definidos anteriormente. A V0 será utilizada principalmente para reduzir os riscos técnicos relacionados à introspecção do PostgreSQL, preparação de contexto, geração de consultas SQL e execução segura. Após a validação desse fluxo, o projeto avançará para a V1, correspondente ao MVP e à principal entrega prevista no TCC, incluindo a integração do backend com uma interface gráfica.
+
+Essa organização também se relaciona com os princípios de customização de processos, ou \textit{tailoring}, estudados durante a disciplina. A implementação gradual de um processo ou solução permite que áreas prioritárias sejam tratadas primeiro, evitando a tentativa de implantação de todos os elementos simultaneamente. No contexto deste projeto, essa ideia será aplicada por meio da divisão da solução em incrementos progressivos, nos quais cada versão adicionará novas capacidades a uma base previamente validada.
+
+Outro princípio considerado será a seleção de artefatos de acordo com o valor que fornecem ao desenvolvimento. Considerando o tamanho da equipe, serão priorizados os documentos e artefatos necessários para apoiar a comunicação, rastreabilidade, implementação e avaliação da solução, evitando a produção de documentação cujo custo de elaboração e manutenção não seja proporcional ao benefício obtido.
+
+Entre os principais artefatos previstos encontram-se:
+
+\begin{itemize}
+
+    \item backlog do produto;
+
+    \item histórias de usuário;
+
+    \item especificação de requisitos;
+
+    \item documentação da arquitetura;
+
+    \item diagramas considerados necessários para representar a solução;
+
+    \item código-fonte versionado;
+
+    \item casos e resultados de testes;
+
+    \item relatório técnico do projeto.
+
+\end{itemize}
+
+A divisão de responsabilidades também será adaptada às características da equipe. Ambos os integrantes participarão do desenvolvimento, especialmente das atividades relacionadas ao backend e ao fluxo central da aplicação. Entretanto, um dos integrantes terá maior concentração nas atividades de organização, documentação e apresentação do projeto, enquanto o outro terá maior concentração na implementação.
+
+Essa divisão não será rígida, e as principais decisões técnicas e atividades de desenvolvimento permanecerão compartilhadas entre os integrantes. Dessa forma, a distribuição de responsabilidades poderá ser representada por uma matriz simplificada, evitando a criação de uma estrutura organizacional desnecessariamente complexa.
+
+O código-fonte será versionado utilizando Git e armazenado em um repositório no GitHub. O versionamento permitirá o acompanhamento das alterações realizadas, a integração do trabalho dos dois integrantes e a recuperação de versões anteriores quando necessário.
+
+A validação do sistema ocorrerá progressivamente durante o desenvolvimento. Será criado um conjunto controlado de perguntas cujos resultados esperados sejam previamente conhecidos, permitindo avaliar o comportamento do sistema diante de diferentes níveis de complexidade.
+
+A avaliação priorizará a correção do resultado retornado, e não necessariamente a igualdade textual entre o SQL produzido pelo sistema e uma consulta de referência. Essa decisão considera que consultas SQL sintaticamente diferentes podem produzir resultados semanticamente equivalentes.
+
+Entre as principais métricas previstas para a avaliação estão:
+
+\begin{itemize}
+
+    \item taxa de respostas corretas;
+
+    \item taxa de consultas SQL executadas com sucesso;
+
+    \item taxa de bloqueio correto de operações proibidas;
+
+    \item quantidade de consultas que exigiram uma ou mais tentativas de correção;
+
+    \item número médio de tentativas realizadas;
+
+    \item latência entre a solicitação do usuário e a apresentação do resultado;
+
+    \item quantidade de tokens utilizados, quando essa informação for disponibilizada pelo provedor;
+
+    \item custo estimado por consulta, quando aplicável.
+
+\end{itemize}
+
+A comparação entre diferentes modelos de linguagem poderá ser realizada internamente durante o desenvolvimento para apoiar a escolha da alternativa que apresente melhor equilíbrio entre qualidade, custo e latência. Entretanto, essa comparação não será considerada, inicialmente, um experimento formal do TCC.
+
+
+\section{Tecnologias}
+
+A seleção das tecnologias previstas para o desenvolvimento foi orientada pela compatibilidade com o problema proposto, maturidade das ferramentas, facilidade de integração, disponibilidade de bibliotecas e conhecimento prévio da equipe.
+
+A solução será estruturada em duas camadas principais de execução: uma aplicação responsável pela interface com o usuário, construída com React, Vite, TypeScript e Electron, e um backend desenvolvido em Python e FastAPI, responsável pela lógica de negócio, introspecção do banco de dados, integração com modelos de linguagem, validação e execução das consultas.
+
+
+\subsection{Python}
+
+Python será utilizado como principal linguagem de programação do backend. A linguagem possui um amplo ecossistema de bibliotecas voltadas à integração com bancos de dados, construção de APIs, manipulação de dados e comunicação com modelos de linguagem, características diretamente relacionadas às necessidades da aplicação.
+
+Além disso, sua utilização permitirá concentrar no mesmo ambiente as etapas de introspecção do banco, preparação de contexto, integração com provedores de inteligência artificial e execução das consultas.
+
+
+\subsection{FastAPI}
+
+O FastAPI será utilizado para a construção da camada de API e para a orquestração dos diferentes módulos do sistema.
+
+O framework será responsável por disponibilizar os serviços utilizados pela interface, receber as solicitações dos usuários e coordenar etapas como conexão com o banco, introspecção, processamento da pergunta, comunicação com o modelo de linguagem e execução das consultas.
+
+
+\subsection{Pydantic}
+
+O Pydantic será utilizado para definição e validação das estruturas de dados utilizadas pela aplicação.
+
+Sua utilização permitirá estabelecer contratos explícitos para entradas e saídas da API, contribuindo para a validação dos dados recebidos e para a organização da comunicação entre os diferentes componentes do sistema.
+
+
+\subsection{PostgreSQL}
+
+O PostgreSQL será o Sistema Gerenciador de Banco de Dados oficialmente suportado no escopo inicial do projeto.
+
+A escolha de um único SGBD para o MVP permitirá concentrar os esforços no desenvolvimento do módulo de descoberta, na compreensão de sua estrutura e na geração correta de consultas compatíveis com seu dialeto SQL.
+
+A aplicação não ficará limitada a um banco previamente configurado. O usuário poderá informar os dados de conexão de diferentes bancos PostgreSQL, desde que as credenciais utilizadas possuam acesso às estruturas que se deseja consultar.
+
+
+\subsection{SQLAlchemy}
+
+O SQLAlchemy será utilizado como camada de acesso ao PostgreSQL e terá papel relevante no módulo de descoberta e introspecção do banco de dados.
+
+Por meio de seus recursos de acesso a metadados e reflexão, será possível obter informações sobre esquemas, tabelas, colunas, tipos e relacionamentos existentes no banco, reduzindo a necessidade de utilizar um modelo de linguagem para tarefas que podem ser realizadas de maneira determinística.
+
+O driver específico utilizado na comunicação entre Python e PostgreSQL será definido durante a implementação, uma vez que sua escolha possui menor impacto sobre a arquitetura geral proposta.
+
+
+\subsection{React, Vite e TypeScript}
+
+A interface da aplicação será desenvolvida utilizando React em conjunto com TypeScript, tendo o Vite como ferramenta de desenvolvimento e \textit{build} do frontend.
+
+O React será utilizado para estruturar a interface e os componentes responsáveis pela interação do usuário com o sistema. A escolha busca facilitar a construção de uma interface modular, permitindo separar elementos relacionados à configuração da conexão, envio de perguntas, apresentação de erros e visualização dos resultados.
+
+O TypeScript será adotado como linguagem principal do frontend, adicionando tipagem estática ao desenvolvimento e contribuindo para a definição de contratos mais claros entre os componentes da interface e os dados recebidos do backend.
+
+O Vite será utilizado como ferramenta de desenvolvimento, empacotamento e geração dos arquivos utilizados pela interface. Sua utilização permitirá manter um fluxo de desenvolvimento simplificado e integrado ao ecossistema React e TypeScript.
+
+Na V1, a interface terá como objetivo disponibilizar um fluxo simples para que o usuário possa configurar a conexão com o banco PostgreSQL, autorizar ou recusar a utilização de amostras de dados, formular perguntas em linguagem natural e visualizar os resultados retornados.
+
+Funcionalidades mais avançadas relacionadas à interpretação textual e visualização gráfica dos resultados poderão ser adicionadas respectivamente nas versões V2 e V3.
+
+
+\subsection{Electron}
+
+O Electron será utilizado para empacotar a interface desenvolvida com React, Vite e TypeScript como uma aplicação desktop executável no computador do usuário.
+
+A adoção dessa tecnologia está relacionada principalmente à necessidade de permitir que a aplicação seja executada próxima ao ambiente onde o banco de dados está disponível. Em diferentes cenários, o PostgreSQL que será consultado poderá estar instalado localmente no computador do usuário ou disponível apenas por meio de uma rede interna, o que tornaria menos adequada a dependência de uma aplicação exclusivamente hospedada em ambiente externo.
+
+Por meio do Electron, será possível reutilizar tecnologias tradicionalmente empregadas no desenvolvimento web para construir a interface gráfica da aplicação, mantendo ao mesmo tempo uma experiência de software desktop.
+
+A aplicação desktop atuará como camada de interação com o usuário, enquanto o processamento relacionado à introspecção do banco, integração com modelos de linguagem, geração de SQL, validação e execução das consultas permanecerá concentrado no backend desenvolvido em Python e FastAPI.
+
+Essa separação permitirá manter responsabilidades distintas entre interface e processamento, ao mesmo tempo em que possibilitará a distribuição da solução como uma aplicação executável localmente.
+
+
+\subsection{Modelos de Linguagem}
+
+Os modelos de linguagem serão responsáveis pelas etapas que exigem interpretação semântica, principalmente a compreensão da solicitação do usuário e a geração das consultas SQL.
+
+A integração será realizada por meio do SDK oficial do provedor selecionado.
+
+Inicialmente, OpenAI e DeepSeek serão considerados como possíveis provedores. A decisão final será realizada durante o desenvolvimento a partir de experimentos internos que considerem fatores como qualidade das consultas produzidas, capacidade de seguir instruções, latência e custo de utilização.
+
+A solução será projetada de maneira a evitar acoplamento excessivo a um único modelo ou provedor, permitindo que essa escolha seja alterada sem exigir modificações significativas nas demais camadas da aplicação.
+
+A descoberta da estrutura do banco permanecerá separada desse processo. Informações que podem ser obtidas deterministicamente, como nomes de tabelas, colunas, tipos e relacionamentos, serão extraídas pelo módulo de introspecção e fornecidas ao modelo como contexto, em vez de delegar ao modelo a responsabilidade de descobrir essas informações.
+
+
+\subsection{Git e GitHub}
+
+Git será utilizado como sistema de controle de versão do código-fonte, enquanto o GitHub será utilizado para hospedagem do repositório e colaboração entre os integrantes.
+
+Essas ferramentas permitirão registrar o histórico de alterações, integrar o trabalho realizado pela equipe e manter rastreabilidade sobre a evolução da implementação.
+
+
+\subsection{Execução Local}
+
+A execução local será adotada como estratégia principal para o MVP.
+
+Essa decisão está relacionada à característica do sistema de interagir com bancos PostgreSQL que poderão estar instalados no próprio computador do usuário ou disponíveis apenas em redes internas. Dessa forma, a execução da aplicação no ambiente do usuário reduz a necessidade de expor o banco de dados a serviços externos apenas para possibilitar a conexão.
+
+O Electron será responsável pela disponibilização da interface como aplicação desktop, enquanto o backend em Python e FastAPI será executado localmente e utilizado pela interface para realizar as operações necessárias.
+
+Não será estabelecido como requisito do projeto que a solução esteja hospedada em ambiente de nuvem ou disponível publicamente pela Internet. A implantação em ambientes remotos poderá ser considerada futuramente, mas não será necessária para a validação da proposta apresentada neste trabalho.

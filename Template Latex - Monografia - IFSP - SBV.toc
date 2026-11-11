@@ -1,0 +1,119 @@
+\changetocdepth {4}
+\babel@toc {brazil}{}\relax 
+\babel@toc {brazil}{}\relax 
+\setlength {\cftchapterindent }{\cftlastnumwidth } \setlength {\cftchapternumwidth }{2em}
+\setlength {\cftchapterindent }{\cftlastnumwidth } \setlength {\cftchapternumwidth }{2em}
+\setlength {\cftchapterindent }{\cftlastnumwidth } \setlength {\cftchapternumwidth }{2em}
+\setlength {\cftchapterindent }{\cftlastnumwidth } \setlength {\cftchapternumwidth }{2em}
+\setlength {\cftchapterindent }{\cftlastnumwidth } \setlength {\cftchapternumwidth }{2em}
+\setlength {\cftchapterindent }{\cftlastnumwidth } \setlength {\cftchapternumwidth }{2em}
+\setlength {\cftchapterindent }{\cftlastnumwidth } \setlength {\cftchapternumwidth }{2em}
+\setlength {\cftchapterindent }{0em} \setlength {\cftchapternumwidth }{\cftlastnumwidth }
+\contentsline {chapter}{\chapternumberline {1}\MakeTextUppercase []{Introdução}}{29}{chapter.1}%
+\contentsline {section}{\numberline {1.1}Justificativa}{30}{section.1.1}%
+\contentsline {section}{\numberline {1.2}Objetivos}{31}{section.1.2}%
+\contentsline {subsection}{\numberline {1.2.1}Objetivo Geral}{31}{subsection.1.2.1}%
+\contentsline {subsection}{\numberline {1.2.2}Objetivos Específicos}{31}{subsection.1.2.2}%
+\setlength {\cftchapterindent }{0em} \setlength {\cftchapternumwidth }{\cftlastnumwidth }
+\contentsline {chapter}{\chapternumberline {2}\MakeTextUppercase []{Método de Desenvolvimento}}{33}{chapter.2}%
+\contentsline {section}{\numberline {2.1}Visão Geral do Projeto}{33}{section.2.1}%
+\contentsline {section}{\numberline {2.2}Requisitos}{35}{section.2.2}%
+\contentsline {subsection}{\numberline {2.2.1}Requisitos Funcionais}{35}{subsection.2.2.1}%
+\contentsline {subsection}{\numberline {2.2.2}Requisitos Não Funcionais}{36}{subsection.2.2.2}%
+\contentsline {subsection}{\numberline {2.2.3}Não Escopo}{38}{subsection.2.2.3}%
+\contentsline {section}{\numberline {2.3}Processo de Desenvolvimento de Software}{38}{section.2.3}%
+\contentsline {section}{\numberline {2.4}Tecnologias}{41}{section.2.4}%
+\contentsline {subsection}{\numberline {2.4.1}Python}{41}{subsection.2.4.1}%
+\contentsline {subsection}{\numberline {2.4.2}FastAPI}{41}{subsection.2.4.2}%
+\contentsline {subsection}{\numberline {2.4.3}Pydantic}{42}{subsection.2.4.3}%
+\contentsline {subsection}{\numberline {2.4.4}PostgreSQL}{42}{subsection.2.4.4}%
+\contentsline {subsection}{\numberline {2.4.5}SQLAlchemy}{42}{subsection.2.4.5}%
+\contentsline {subsection}{\numberline {2.4.6}React, Vite e TypeScript}{42}{subsection.2.4.6}%
+\contentsline {subsection}{\numberline {2.4.7}Electron}{43}{subsection.2.4.7}%
+\contentsline {subsection}{\numberline {2.4.8}Modelos de Linguagem}{44}{subsection.2.4.8}%
+\contentsline {subsection}{\numberline {2.4.9}Git e GitHub}{44}{subsection.2.4.9}%
+\contentsline {subsection}{\numberline {2.4.10}Execução Local}{44}{subsection.2.4.10}%
+\setlength {\cftchapterindent }{0em} \setlength {\cftchapternumwidth }{\cftlastnumwidth }
+\contentsline {chapter}{\chapternumberline {3}\MakeTextUppercase []{Resultados e Discussão}}{47}{chapter.3}%
+\setlength {\cftchapterindent }{0em} \setlength {\cftchapternumwidth }{\cftlastnumwidth }
+\contentsline {chapter}{\chapternumberline {4}\MakeTextUppercase []{Conclusões Parciais}}{49}{chapter.4}%
+\contentsline {section}{\numberline {4.1}Papel do Contexto na Solução}{49}{section.4.1}%
+\contentsline {section}{\numberline {4.2}Definições Consolidadas e Pendências}{50}{section.4.2}%
+\contentsline {section}{\numberline {4.3}Avaliação Prevista e Evoluções}{50}{section.4.3}%
+\setlength {\cftchapterindent }{0em} \setlength {\cftchapternumwidth }{\cftlastnumwidth }
+\contentsline {chapter}{\chapternumberline {5}\MakeTextUppercase []{Cronograma e Gestão de Pessoas}}{53}{chapter.5}%
+\contentsline {section}{\numberline {5.1}Gestão de Pessoas}{53}{section.5.1}%
+\contentsline {section}{\numberline {5.2}Cronograma das Atividades}{54}{section.5.2}%
+\contentsline {section}{\numberline {5.3}Planejamento da Avaliação}{55}{section.5.3}%
+\vspace {\cftbeforechapterskip }
+\setlength {\cftchapterindent }{\cftlastnumwidth } \setlength {\cftchapternumwidth }{2em}
+\contentsline {chapter}{\MakeTextUppercase []{Refer\^encias}}{59}{section*.22}%
+\renewcommand *{\cftappendixname }{AP\^ENDICE \space }
+\setlength {\cftpartindent }{\cftlastnumwidth } \setlength {\cftpartnumwidth }{2em}
+\cftinsert {A}
+\contentsline {part}{\MakeTextUppercase []{Ap\^endices}}{61}{section*.23}%
+\setlength {\cftchapterindent }{0em} \setlength {\cftchapternumwidth }{\cftlastnumwidth }
+\setlength {\cftchapterindent }{\cftlastnumwidth } \setlength {\cftchapternumwidth }{2em}
+\cftinsert {A}
+\contentsline {appendix}{\chapternumberline {A}\MakeTextUppercase []{Modelo de Requisitos do Sistema}}{63}{appendix.A}%
+\contentsline {section}{\numberline {A.1}Atores}{63}{section.A.1}%
+\contentsline {section}{\numberline {A.2}Regras de Negócio}{63}{section.A.2}%
+\contentsline {section}{\numberline {A.3}Casos de Uso}{64}{section.A.3}%
+\contentsline {subsection}{\numberline {A.3.1}UC01 -- Configurar conexão com o banco}{64}{subsection.A.3.1}%
+\contentsline {subsection}{\numberline {A.3.2}UC02 -- Identificar estrutura do banco}{65}{subsection.A.3.2}%
+\contentsline {subsection}{\numberline {A.3.3}UC03 -- Gerenciar consentimento de amostragem}{66}{subsection.A.3.3}%
+\contentsline {subsection}{\numberline {A.3.4}UC04 -- Realizar consulta em linguagem natural}{66}{subsection.A.3.4}%
+\contentsline {subsection}{\numberline {A.3.5}UC05 -- Validar solicitação e consulta}{67}{subsection.A.3.5}%
+\contentsline {subsection}{\numberline {A.3.6}UC06 -- Executar consulta e apresentar resultado}{67}{subsection.A.3.6}%
+\contentsline {subsection}{\numberline {A.3.7}UC07 -- Corrigir consulta automaticamente}{68}{subsection.A.3.7}%
+\contentsline {subsection}{\numberline {A.3.8}UC08 -- Tratar falha}{68}{subsection.A.3.8}%
+\contentsline {section}{\numberline {A.4}Rastreabilidade dos Requisitos}{68}{section.A.4}%
+\contentsline {section}{\numberline {A.5}Critérios de Verificação dos Requisitos Não Funcionais}{68}{section.A.5}%
+\setlength {\cftchapterindent }{0em} \setlength {\cftchapternumwidth }{\cftlastnumwidth }
+\setlength {\cftchapterindent }{\cftlastnumwidth } \setlength {\cftchapternumwidth }{2em}
+\cftinsert {A}
+\contentsline {appendix}{\chapternumberline {B}\MakeTextUppercase []{Modelo Estrutural do Sistema}}{71}{appendix.B}%
+\contentsline {section}{\numberline {B.1}Modelo de Domínio}{71}{section.B.1}%
+\contentsline {section}{\numberline {B.2}Modelo de Módulos do Backend}{71}{section.B.2}%
+\contentsline {section}{\numberline {B.3}Considerações sobre o Modelo}{71}{section.B.3}%
+\setlength {\cftchapterindent }{0em} \setlength {\cftchapternumwidth }{\cftlastnumwidth }
+\setlength {\cftchapterindent }{\cftlastnumwidth } \setlength {\cftchapternumwidth }{2em}
+\cftinsert {A}
+\contentsline {appendix}{\chapternumberline {C}\MakeTextUppercase []{Modelo Comportamental do Sistema}}{77}{appendix.C}%
+\setlength {\cftchapterindent }{0em} \setlength {\cftchapternumwidth }{\cftlastnumwidth }
+\setlength {\cftchapterindent }{\cftlastnumwidth } \setlength {\cftchapternumwidth }{2em}
+\cftinsert {A}
+\contentsline {appendix}{\chapternumberline {D}\MakeTextUppercase []{Modelo da Arquitetura do Sistema}}{79}{appendix.D}%
+\setlength {\cftchapterindent }{0em} \setlength {\cftchapternumwidth }{\cftlastnumwidth }
+\setlength {\cftchapterindent }{\cftlastnumwidth } \setlength {\cftchapternumwidth }{2em}
+\cftinsert {A}
+\contentsline {appendix}{\chapternumberline {E}\MakeTextUppercase []{Modelo de Dados do Sistema}}{81}{appendix.E}%
+\setlength {\cftchapterindent }{0em} \setlength {\cftchapternumwidth }{\cftlastnumwidth }
+\setlength {\cftchapterindent }{\cftlastnumwidth } \setlength {\cftchapternumwidth }{2em}
+\cftinsert {A}
+\contentsline {appendix}{\chapternumberline {F}\MakeTextUppercase []{Outro Apêndice}}{83}{appendix.F}%
+\cftinsert {AAA}
+\renewcommand *{\cftappendixname }{ANEXO \space }
+\setlength {\cftpartindent }{\cftlastnumwidth } \setlength {\cftpartnumwidth }{2em}
+\cftinsert {A}
+\contentsline {part}{\MakeTextUppercase []{Anexos}}{85}{section*.33}%
+\setlength {\cftchapterindent }{0em} \setlength {\cftchapternumwidth }{\cftlastnumwidth }
+\setlength {\cftchapterindent }{\cftlastnumwidth } \setlength {\cftchapternumwidth }{2em}
+\cftinsert {A}
+\contentsline {appendix}{\chapternumberline {A}\MakeTextUppercase []{Título do Anexo A}}{87}{appendix.anexochapback.1}%
+\setlength {\cftchapterindent }{0em} \setlength {\cftchapternumwidth }{\cftlastnumwidth }
+\setlength {\cftchapterindent }{\cftlastnumwidth } \setlength {\cftchapternumwidth }{2em}
+\cftinsert {A}
+\contentsline {appendix}{\chapternumberline {B}\MakeTextUppercase []{Título do Anexo B}}{89}{appendix.anexochapback.2}%
+\setlength {\cftchapterindent }{0em} \setlength {\cftchapternumwidth }{\cftlastnumwidth }
+\setlength {\cftchapterindent }{\cftlastnumwidth } \setlength {\cftchapternumwidth }{2em}
+\cftinsert {A}
+\contentsline {appendix}{\chapternumberline {C}\MakeTextUppercase []{Título do Anexo C}}{91}{appendix.anexochapback.3}%
+\setlength {\cftchapterindent }{0em} \setlength {\cftchapternumwidth }{\cftlastnumwidth }
+\setlength {\cftchapterindent }{\cftlastnumwidth } \setlength {\cftchapternumwidth }{2em}
+\cftinsert {A}
+\contentsline {appendix}{\chapternumberline {D}\MakeTextUppercase []{Título do Anexo D}}{93}{appendix.anexochapback.4}%
+\setlength {\cftchapterindent }{0em} \setlength {\cftchapternumwidth }{\cftlastnumwidth }
+\setlength {\cftchapterindent }{\cftlastnumwidth } \setlength {\cftchapternumwidth }{2em}
+\cftinsert {A}
+\contentsline {appendix}{\chapternumberline {E}\MakeTextUppercase []{Título do Anexo E}}{95}{appendix.anexochapback.5}%

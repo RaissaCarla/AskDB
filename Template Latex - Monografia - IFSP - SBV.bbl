@@ -1,0 +1,40 @@
+\providecommand{\abntreprintinfo}[1]{%
+ \citeonline{#1}}
+\setlength{\labelsep}{0pt}\begin{thebibliography}{}
+\providecommand{\abntrefinfo}[3]{}
+\providecommand{\abntbstabout}[1]{}
+\abntbstabout{v<VERSION> }
+
+\bibitem[Deng, Chen e Zhang 2022]{deng2022recent}
+\abntrefinfo{Deng, Chen e Zhang}{Deng; Chen; Zhang}{2022}
+{DENG, N.; CHEN, Y.; ZHANG, Y. Recent advances in text-to-{SQL}: A survey of
+  what we have and what we expect. In:  \textbf{Proceedings of the 29th
+  International Conference on Computational Linguistics}. Gyeongju, Republic of
+  Korea: International Committee on Computational Linguistics, 2022. p.
+  2166--2187. Dispon{\'\i}vel em:
+  \url{https://aclanthology.org/2022.coling-1.190/}.}
+
+\bibitem[PRESSMAN 2016]{Pressman}
+\abntrefinfo{PRESSMAN}{PRESSMAN}{2016}
+{PRESSMAN, S.~R. \textbf{Engenharia de Software, uma Abordagem Profissional}.
+  [S.l.: s.n.], 2016.}
+
+\bibitem[Sommerville 2003]{Sommerville}
+\abntrefinfo{Sommerville}{Sommerville}{2003}
+{SOMMERVILLE, I. \textbf{Engenharia de Software}. [S.l.: s.n.], 2003.}
+
+\bibitem[Sommerville 2007]{sommerville2007engenharia}
+\abntrefinfo{Sommerville}{Sommerville}{2007}
+{SOMMERVILLE, I. \textbf{Engenharia de Software, 8 edi{\c{c}}{\~a}o}. [S.l.:
+  s.n.], 2007.}
+
+\bibitem[Yu et al. 2018]{yu2018spider}
+\abntrefinfo{Yu et al.}{Yu et al.}{2018}
+{YU, T. et al. {Spider}: A large-scale human-labeled dataset for complex and
+  cross-domain semantic parsing and text-to-{SQL} task. In:
+  \textbf{Proceedings of the 2018 Conference on Empirical Methods in Natural
+  Language Processing}. Brussels, Belgium: Association for Computational
+  Linguistics, 2018. p. 3911--3921. Dispon{\'\i}vel em:
+  \url{https://aclanthology.org/D18-1425/}.}
+
+\end{thebibliography}

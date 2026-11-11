@@ -1,0 +1,35 @@
+\begin{center}
+   	
+   	\Large\textsc{\imprimirautor}
+   	\vspace{2.5cm}
+   	
+        \LARGE\textbf{\imprimirtitulo\ifdef{\osubtitulo}{:}{}}
+                           
+    \ifdef{\osubtitulo}{\Large\imprimirsubtitulo}{}
+   	\vspace{2.5cm}
+   	   	
+   	\hspace{.4\textwidth}
+   	\begin{minipage}{.5\textwidth}
+   		\SingleSpacing
+   		\large\imprimirpreambulo
+   		
+   		\vspace{\onelineskip}
+   		
+   		Orientador: \imprimirorientador
+   		
+        \ifdef{\ocoorientador}{
+     		\vspace{\onelineskip}
+   		
+    		Coorientador: \imprimircoorientador
+        }{}
+   		
+   	\end{minipage}%
+    \vfill
+   	
+   	\large\textsc{\imprimirlocal}
+   	
+   	\large\textsc{\imprimirano}
+   	
+   	\vspace*{2cm}
+   	
+\end{center}

@@ -1,0 +1,34 @@
+\chapter{Conclusões Parciais}
+\label{cap:04}
+
+A etapa de pré-projeto permitiu delimitar a proposta de um sistema de apoio à análise de dados por meio de perguntas em linguagem natural, com PostgreSQL como sistema gerenciador de banco de dados inicialmente suportado. Foram estabelecidos o fluxo principal da aplicação, os requisitos e a organização do desenvolvimento em incrementos. A V0 será utilizada como prova de conceito para verificar a viabilidade técnica da solução, enquanto a V1 constituirá o Produto Mínimo Viável e o compromisso de entrega do trabalho.
+
+No estado atual, o projeto dispõe de documentação e de rascunhos iniciais de módulos, ainda pouco integrados. Dessa forma, as conclusões desta etapa dizem respeito às definições e à organização da proposta. A correção das respostas, a efetividade dos mecanismos de segurança e a adequação da experiência de uso ainda deverão ser verificadas durante o desenvolvimento e a avaliação do protótipo.
+
+\section{Papel do Contexto na Solução}
+
+Uma das principais conclusões do planejamento é que o valor esperado da solução depende fortemente da qualidade do contexto fornecido ao modelo de linguagem. O modelo precisa relacionar os termos utilizados na pergunta com as estruturas e os dados disponíveis no banco, de modo que a geração de SQL corresponda à intenção do usuário.
+
+Por esse motivo, o módulo de descoberta e introspecção do banco, associado à preparação do contexto, constitui um dos componentes centrais da proposta. Sua responsabilidade será identificar esquemas, tabelas, colunas, tipos, chaves e relacionamentos, organizando essas informações para utilização nas etapas de interpretação e geração de consultas. A extração dessas informações estruturais será determinística, sem delegar ao modelo a descoberta da estrutura do banco.
+
+Entretanto, a estrutura do banco não descreve necessariamente todo o significado de negócio dos dados. Nomes, comentários e amostras poderão auxiliar a interpretação, mas códigos internos e conceitos como faturamento, pedido concluído ou cliente ativo podem depender de regras não explicitadas nas tabelas. A suficiência do contexto disponível será, portanto, uma questão a investigar, sem pressupor que a introspecção permita reconstruir automaticamente todas as regras de negócio.
+
+Para a V0 e a V1, a utilização de amostras dependerá de autorização explícita do usuário. Quando autorizada, a coleta será limitada a até cem registros por tabela, incluindo todas as colunas. Quando recusada, o contexto será composto apenas pelos metadados estruturais disponíveis. Esse consentimento será tratado como uma decisão binária, sem introduzir mecanismos adicionais de seleção de colunas no escopo obrigatório do MVP.
+
+\section{Definições Consolidadas e Pendências}
+
+A implementação utilizará Python e FastAPI no backend e React, Vite e TypeScript na interface. O Electron será empregado para disponibilizar a interface como aplicação desktop, integrada ao backend executado localmente. A execução local será a estratégia principal da V1, sem compromisso de implantação pública em nuvem.
+
+A segurança será apoiada no uso de credenciais com permissões somente de leitura, na validação independente da consulta gerada e no controle da execução pelo backend. A avaliação realizada pelo modelo sobre a solicitação terá caráter complementar e não substituirá os mecanismos de restrição do banco e de validação da aplicação.
+
+O processamento de uma pergunta admitirá, no máximo, três tentativas no total: uma tentativa inicial e até duas correções automáticas. Cada consulta produzida deverá passar novamente pela validação antes da execução. Esgotado esse limite, a aplicação encerrará a operação de forma controlada e informará a falha ao usuário.
+
+Ainda deverão ser definidos o provedor e o modelo de linguagem inicial, os parâmetros operacionais de execução e as metas definitivas de desempenho. A escolha do modelo será apoiada em testes internos, considerando correção, capacidade de seguir instruções, latência e custo, preservando a possibilidade de substituição do provedor.
+
+\section{Avaliação Prevista e Evoluções}
+
+A avaliação utilizará um banco PostgreSQL fictício do domínio comercial, contendo clientes, produtos, pedidos e itens de pedido, com dados e regras de negócio previamente conhecidos pelos autores. As perguntas serão formuladas em português e seus resultados serão comparados com consultas de referência e respostas esperadas.
+
+Será investigado o efeito das amostras na qualidade das respostas por meio da comparação entre duas configurações: contexto formado apenas pelo esquema e contexto formado pelo mesmo esquema acrescido de amostras autorizadas. O modelo, as instruções, as perguntas e os dados do banco serão mantidos constantes entre as configurações. Essa comparação permitirá observar o efeito da inclusão de amostras no cenário avaliado, sem pressupor melhoria obrigatória nem generalização dos resultados para outros bancos.
+
+As versões V2 e V3 permanecerão como possibilidades de evolução, contemplando, respectivamente, explicações textuais dos resultados e visualizações gráficas. Catálogos semânticos, glossários de negócio e mecanismos de recuperação de contexto poderão ser estudados posteriormente, caso as limitações observadas indiquem sua necessidade. Essas funcionalidades não serão consideradas requisitos obrigatórios para a conclusão da V1.
