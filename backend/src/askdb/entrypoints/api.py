@@ -5,10 +5,11 @@ from fastapi.responses import JSONResponse
 from askdb.bootstrap import build_use_case
 from askdb.queries.errors import ApplicationError
 from askdb.queries.models import SqlGenerationRequest, SqlProposal
+from askdb.queries.generate import GenerateSqlUseCase
 
 
 def create_app(use_case=None) -> FastAPI:
-    application = FastAPI(title="AskDB — marco de 20%", description="Geração e validação; não executa SQL.")
+    application = FastAPI(title="AskDB — V0", description="Geração contextualizada e validação; esta API não executa SQL.")
 
     @application.exception_handler(RequestValidationError)
     async def invalid_input(request, error):
@@ -19,7 +20,11 @@ def create_app(use_case=None) -> FastAPI:
     async def application_error(request, error):
         statuses = {"llm_timeout": 504, "llm_invalid_response": 502,
                     "database_unavailable": 503, "schema_unavailable": 503,
-                    "llm_unavailable": 503, "configuration_error": 503}
+                    "llm_unavailable": 503, "configuration_error": 503,
+                    "llm_authentication_failed": 503, "llm_rate_limited": 503,
+                    "knowledge_unavailable": 503, "context_budget_unavailable": 503,
+                    "context_limit_exceeded": 422, "connection_mismatch": 503,
+                    "generation_attempts_exhausted": 502}
         return JSONResponse(status_code=statuses.get(error.code, 500), content={
             "error": {"code": error.code, "message": error.message}})
 
@@ -35,7 +40,12 @@ def create_app(use_case=None) -> FastAPI:
     @application.post("/queries/generate", response_model=SqlProposal)
     def generate(request: SqlGenerationRequest):
         try:
-            return (use_case if use_case is not None else build_use_case()).execute(request)
+            generation = use_case if use_case is not None else build_use_case()
+            if isinstance(generation, GenerateSqlUseCase) and generation.session is not None:
+                # Uma entrada HTTP não herda uma conversa CLI, nem mesmo por injeção explícita.
+                generation = GenerateSqlUseCase(generation.catalog, generation.llm, generation.validator,
+                    context_builder=generation.context_builder, connection_id=generation.connection_id)
+            return generation.execute(request)
         except ApplicationError:
             raise
         except Exception:

@@ -1,193 +1,229 @@
-# Backend AskDB — marco de 20%
+# Backend AskDB — V0
 
-O backend oferece geração e validação de propostas SQL por FastAPI e por CLI,
-compartilhando o mesmo caso de uso, com catálogo PostgreSQL real e Ollama local.
-As verificações e evidências ambientais estão em `evidencias-marco20.md`.
+O backend oferece geração contextualizada e validação de SQL por CLI e FastAPI.
+A CLI permite confirmar e executar a proposta exata em PostgreSQL somente leitura.
+DeepSeek BYOK, Ollama e OpenAI usam o mesmo contrato. O estado das verificações
+reais e simuladas está em [evidencias-v0.md](evidencias-v0.md); o registro do marco
+anterior permanece em `evidencias-marco20.md`.
 
-## Preparar ambiente (PowerShell, na raiz do repositório)
+## Preparar ambiente
+
+Na raiz do repositório, com Python 3.11+:
 
 ```powershell
 py -3.11 -m venv backend/.venv
 backend/.venv/Scripts/python.exe -m pip install -e './backend[dev]'
-backend/.venv/Scripts/python.exe -m pytest backend/tests -q
+backend/.venv/Scripts/python.exe -m pytest backend/tests -m 'not integration' -q
 ```
 
-Python 3.11 ou superior é necessário. Use o executável do ambiente virtual para
-evitar conflitos com outras instalações Python no PATH.
+API e CLI carregam `backend/.env`, independente da pasta atual. Copie
+`.env.example` e ajuste a conexão de desenvolvimento; variáveis do processo
+prevalecem. A aplicação não regrava esse arquivo. Não use credencial administrativa
+no fluxo da aplicação. Chaves remotas não são lidas do `.env`: use ambiente do
+processo ou entrada oculta na CLI.
 
-## Configuração
-
-API e CLI carregam automaticamente `backend/.env`, independentemente da pasta
-atual do terminal. Para um checkout novo, copie `backend/.env.example` para
-`backend/.env` e ajuste os valores. O arquivo local é ignorado pelo Git.
-Variáveis já definidas no terminal prevalecem sobre o arquivo; remova valores
-antigos com `Remove-Item Env:DATABASE_URL -ErrorAction SilentlyContinue` se necessário.
-O exemplo contém credenciais públicas exclusivas de desenvolvimento local.
-O carregamento não modifica variáveis globais nem grava senhas pela aplicação.
-
-| Variável | Valor inicial |
+| Variável | Padrão / finalidade |
 |---|---|
-| DATABASE_URL | Obrigatória, URI PostgreSQL |
-| OLLAMA_URL | http://127.0.0.1:11434 |
-| OLLAMA_MODEL | qwen3.5:9b |
-| LLM_TIMEOUT | 120 segundos |
-| CONNECT_TIMEOUT | 5 segundos |
+| `DATABASE_URL` | URI PostgreSQL obrigatória, com role explícita e de leitura |
+| `LLM_PROVIDER` | `ollama`; selecione `deepseek` ou `openai` explicitamente |
+| `LLM_MODEL` | Substitui o modelo do provedor configurado |
+| `OLLAMA_URL`, `OLLAMA_MODEL` | `http://127.0.0.1:11434`, `qwen3.5:9b` |
+| `DEEPSEEK_API_KEY`, `OPENAI_API_KEY` | Chave runtime própria do provedor selecionado |
+| `LLM_TIMEOUT`, `CONNECT_TIMEOUT` | 120 s e 5 s |
+| `LLM_CONTEXT_WINDOW`, `LLM_OUTPUT_RESERVE` | 16384 e 2048 tokens |
+| `ASKDB_MAX_ROWS` | 100 linhas, entre 1 e 1000 |
+| `ASKDB_APP_DATA_DIR` | Override absoluto da pasta de dados por usuário |
 
-Configuração inválida gera mensagem sanitizada. O campo que contém a conexão
-é protegido na representação dos objetos; isso não substitui um cofre de segredos.
-
-## Organização
-
-- `queries`: modelos da pergunta/proposta, política e caso de uso.
-- `databases`: catálogo autorizado, contrato e integração PostgreSQL.
-- `llm`: contrato e integração Ollama.
-- `entrypoints`: entradas HTTP e terminal que compartilham o caso de uso.
-- `settings.py`: configuração única por ambiente.
-- `tests/unit` e `tests/integration`: verificações determinísticas e banco real.
-
-## Política SQL inicial
-
-O validador aceita uma única SELECT com projeções, filtros, JOINs, GROUP BY/HAVING,
-ORDER BY, DISTINCT, LIMIT/OFFSET e COUNT, SUM, AVG, MIN, MAX, LOWER, UPPER e COALESCE
-não qualificadas. Inspeciona toda a árvore sintática PostgreSQL com lista positiva
-de expressões. Motivos de bloqueio têm código estável e mensagem em português.
-
-Escrita, DDL, múltiplos comandos, SELECT INTO, locks, catálogos do sistema,
-funções desconhecidas, CTEs, subconsultas, UNION e outras construções não suportadas
-são bloqueados, inclusive em expressões internas. A aprovação não comprova
-existência de objetos, interpretação correta, baixo custo ou segurança de execução.
-Nenhuma SQL gerada será executada neste marco.
-
-## PostgreSQL de demonstração
-
-Com `backend/.env` configurado, suba o banco na raiz do repositório:
+## PostgreSQL sintético
 
 ```powershell
 docker compose --env-file backend/.env -f backend/compose.yaml up -d --wait
 ```
 
-Para outra porta, altere `ASKDB_POSTGRES_PORT` no arquivo antes de subir e use essa porta
-em `DATABASE_URL`. A aplicação nunca deve usar a credencial administrativa.
-As senhas deste exemplo são exclusivas de desenvolvimento. Não use senhas reais
-do usuário nem copie as variáveis para arquivos versionados.
+Configure as senhas de desenvolvimento exigidas pelo Compose e `DATABASE_URL`
+com a role `askdb_reader`. A porta padrão é 5433, alterável por
+`ASKDB_POSTGRES_PORT`. A seed comercial contém clientes, produtos, pedidos e
+itens, além de fixtures para permissões, chaves compostas, RLS, tipos e truncamento.
+A seed só é aplicada em volume novo. Não remova volumes existentes para repetir
+uma verificação; use o roteiro isolado abaixo.
 
-A seed é aplicada somente na primeira inicialização do volume. Reiniciar o
-contêiner preserva dados e credenciais anteriores. Não apague volumes existentes
-para repetir testes: prefira um projeto Compose novo e uma porta livre.
+## Pasta local e contexto por conexão
 
-O catálogo usa somente tabelas de aplicação, colunas com SELECT efetivo e
-relacionamentos cujas duas pontas são autorizadas. É descoberto por solicitação,
-sem amostras e sem cache. A role de demonstração não tem escrita, superuser ou
-BYPASSRLS; informações de catálogo não substituem permissões reais no banco.
-
-Para os testes reais, aponte `ASKDB_TEST_DATABASE_URL` para a role de leitura e
-`ASKDB_TEST_ADMIN_URL` para a role administrativa **somente do banco de teste**:
-
-```powershell
-backend/.venv/Scripts/python.exe -m pytest backend/tests/integration -q
+```text
+%LOCALAPPDATA%\AskDB\
+  connections\
+    <id-da-conexao>\
+      context.md
 ```
 
-Sem essas variáveis, testes de integração são explicitamente ignorados. O banco
-de testes inclui tabelas restritas e chaves compostas para conferir o isolamento.
-
-## Ollama local
-
-Prepare o runtime Ollama e o modelo manualmente. Confira `ollama list` e, se
-necessário, execute `ollama pull qwen3.5:9b` por sua decisão. A aplicação não
-instala runtime, baixa modelos, troca de provedor ou repete chamadas automaticamente.
-O endpoint e modelo são configurados pelas variáveis da tabela acima.
-
-O adaptador usa a [API de chat do Ollama](https://docs.ollama.com/api/chat),
-sem streaming de tokens para o usuário. Lê somente o conteúdo final, nunca o
-raciocínio separado. Remove apenas um bloco Markdown integral; explicações ou
-comandos extras não são descartados para tentar aprovar uma parte da resposta.
-
-Limites iniciais: 64 KiB de resposta HTTP, 16000 caracteres de SQL, contexto de
-32000 caracteres, conexão de 5 s e inferência de 120 s. Contexto excessivo é
-recusado sem corte silencioso; caracteres não equivalem a tokens.
-`LLM_TIMEOUT` e `CONNECT_TIMEOUT` podem ser ajustados. Modelo ausente gera
-`llm_unavailable`, timeout gera `llm_timeout` e saída incompleta/inválida gera
-`llm_invalid_response`. Verifique runtime/modelo, recursos disponíveis e limites
-quando houver falhas. Perguntas e metadados continuam sujeitos à política fixa.
-
-## Fluxo e erros
-
-`GenerateSqlUseCase` valida a pergunta, descobre o catálogo, monta o contexto,
-chama a LLM uma vez e aplica a política. `bootstrap.build_use_case` compõe os
-adaptadores; nenhum contrato de execução SQL existe nesta entrega.
-
-Eventos do logger `askdb` são JSON com fase, código e duração, sem conteúdo da
-pergunta, SQL completa, senha ou resposta externa. Categorias públicas:
-`configuration_error`, `database_unavailable`, `schema_unavailable`,
-`llm_unavailable`, `llm_timeout`, `llm_invalid_response`.
-Logs não são auditoria inviolável; erros externos são substituídos por mensagens
-fixas e seguras. Aprovação significa apenas conformidade com a política inicial.
-
-## FastAPI e Swagger
-
-Depois de configurar o banco e o Ollama, inicie na raiz do repositório:
+O ID considera host, porta, database e role, sem senha. Duas roles no mesmo banco
+possuem contextos separados. O caminho não depende do checkout, da pasta de
+instalação ou do diretório corrente. A composição prepara apenas os diretórios,
+sem criar nem sobrescrever o Markdown. A CLI mostra o caminho absoluto esperado.
+Para consultar esse caminho antes de iniciar:
 
 ```powershell
-backend/.venv/Scripts/python.exe -m askdb.entrypoints.api
+backend/.venv/Scripts/python.exe -c "from askdb.settings import Settings; s=Settings.from_env(); print(s.app_data_dir / 'connections' / s.connection.id / 'context.md')"
 ```
 
-O servidor inicia em `127.0.0.1:8000`. Abra `http://127.0.0.1:8000/docs` para o
-Swagger. `GET /health` retorna `{"status":"ok"}` sem consultar banco/modelo.
-`POST /queries/generate` recebe `{"question":"Quais são os cinco produtos mais vendidos?"}`.
-Uma resposta tem o formato:
+Prepare o arquivo manualmente em UTF-8; [examples/context.md](examples/context.md)
+é uma referência sintética. Ausência permite contexto vazio informado. Arquivo
+ilegível, UTF-8 inválido, tamanho excessivo ou escape por link/junction causa erro
+explícito. Override de raiz deve ser absoluto e não há fallback silencioso para
+uma pasta do repositório. Testes usam somente diretórios temporários.
 
-```json
-{"sql":"SELECT nome FROM produtos LIMIT 5","validation":{"status":"approved","reasons":[]}}
-```
+`ContextBuilder` combina políticas fixas, catálogo autorizado atual, Markdown
+integral, pergunta e pares de pergunta/SQL permitida da sessão. Markdown e
+histórico são dados, sem autoridade para alterar políticas. Resultados, amostras,
+segredos e erros brutos não entram no contexto da LLM. O arquivo fica no disco
+após encerrar; as conversas e propostas pendentes ficam só em memória na V0.
+SQLite e histórico persistente pertencem à V1, com referência `contexto_path` ao
+Markdown por conexão.
 
-SQL proibida também retorna HTTP 200, com status `blocked` e motivos
-`[{"code":"...","message":"..."}]`. Erros usam `{"error":{"code":"...","message":"..."}}`:
-entrada inválida 422; banco/catálogo/modelo/configuração indisponível 503;
-timeout LLM 504; resposta LLM inválida 502; inesperados 500. Campos extras são
-rejeitados. Não há CORS amplo nem execução SQL nesta API.
+## Perfis de IA e BYOK
 
-## CLI mínima
+A CLI apresenta DeepSeek, Ollama e OpenAI para seleção explícita. O perfil
+DeepSeek usa `https://api.deepseek.com` e `deepseek-flash`; o perfil OpenAI usa
+`https://api.openai.com/v1` e `gpt-4.1-mini`. Modelos são configuráveis, mas o
+orçamento só aceita aqueles cujo método foi validado. Não há troca automática
+de provedor ou modelo em caso de falha.
+
+A chave é obtida do ambiente real do processo ou de `getpass` na CLI. No PowerShell:
 
 ```powershell
+$env:LLM_PROVIDER = 'deepseek'
+$env:DEEPSEEK_API_KEY = [Net.NetworkCredential]::new('', (Read-Host 'Chave DeepSeek' -AsSecureString)).Password
 backend/.venv/Scripts/python.exe -m askdb.entrypoints.cli
 ```
 
-Não é preciso iniciar o servidor HTTP. A CLI chama diretamente o mesmo caso de
-uso da API, usando banco e modelo configurados. Exemplo de interação (a SQL real
-pode variar conforme o modelo):
+Não coloque a chave no contexto, no chat nem em arquivos versionados. O código
+não a grava: ela fica na autenticação HTTPS e não faz parte do `LLMProfile` ou
+prompt. O provedor remoto recebe pergunta, esquema, Markdown e pares pergunta/SQL;
+resultados ficam locais. Para OpenAI, use `OPENAI_API_KEY` e `LLM_PROVIDER=openai`.
+Cada adaptador tem configuração e parâmetros próprios; apenas helpers privados
+de transporte/normalização são compartilhados.
 
-```text
-Sua pergunta > Liste os produtos
+Ollama deve estar preparado manualmente, com `qwen3.5:9b` disponível. A aplicação
+não instala runtime nem baixa modelos/tokenizadores ao perguntar. O transporte
+não repete chamadas. Só conteúdo final completo é candidato a SQL; raciocínio,
+ferramentas e saídas truncadas são rejeitados. Limites de resposta: 64 KiB de
+corpo e 16000 caracteres de SQL final.
 
-Consultando o esquema, gerando e validando a SQL... Aguarde.
+### Orçamento de contexto
 
-------------------------------------------------------------
-SQL proposta
+`TokenBudgetPolicy` usa `utf8_upper_bound_v1`: bytes UTF-8 do texto, com margem de
+512 tokens mais 64 por mensagem para o envelope. É estimativa conservadora,
+validada para os perfis suportados, não contagem exata; pode recusar texto que
+caberia no modelo. Os limites são 8000 para Markdown e
+`min(16000, janela - reserva)` para toda a entrada, com reserva inicial de 2048.
+Não há corte silencioso de regras ou pares: reduza explicitamente o arquivo ou
+inicie outra sessão quando necessário.
 
-SELECT nome FROM produtos
+Artefatos oficiais DeepSeek V4 e Qwen3.5-9B estão fixados por SHA-256 em
+`tests/fixtures/tokenizer-manifest.json`. A verificação offline usa
+`tokenizers==0.22.1`; OpenAI usa `tiktoken==0.12.0`/`o200k_base`, apenas no extra
+`tokenizer-verification`. Uso retornado em chamadas reais é a referência efetiva.
 
-------------------------------------------------------------
-[OK] Proposta aprovada pela política inicial.
-Você pode inspecionar e copiar a SQL acima.
-Tempo total: 2.0 s | SQL não executada.
-------------------------------------------------------------
+## Geração, correção e execução
 
-Sua pergunta > sair
+1. A pergunta textual é normalizada e validada (1–2000 caracteres).
+2. O catálogo respeita a role configurada, sem superuser/BYPASSRLS.
+3. A geração usa contexto limitado e aplica `SqlPolicyValidator`.
+4. Uma proposta permitida fica em memória por dez minutos, vinculada à SQL exata,
+   conexão, sessão e pergunta. Nova pergunta/cancelamento invalida a anterior.
+5. A CLI mostra SQL e destino e exige `sim`/`s`; vazio, negativa, EOF e interrupção
+   não confirmam. `approved` da política não equivale a confirmação humana.
+6. `ExecuteSqlUseCase` revalida e consome atomicamente a proposta antes do banco.
+   Erro posterior também consome o ID, sem execução duplicada ou retry oculto.
+7. O executor usa transação read-only, timeout de 30 s, lock timeout de 5 s e
+   `search_path=pg_catalog,public`; RLS e privilégios continuam valendo.
+8. Um cursor de servidor busca no máximo `max_rows+1`, apresenta até o limite e
+   indica truncamento. A SQL confirmada não é reescrita. Recursos são liberados
+   com rollback/fechamento também em erro ou cancelamento.
 
-Sessão encerrada. Até a próxima!
+A política admite SELECT simples, filtros, JOIN, agrupamento, ordenação, DISTINCT,
+LIMIT/OFFSET e COUNT, SUM, AVG, MIN, MAX, LOWER, UPPER, COALESCE. Escrita, DDL,
+comandos múltiplos, INTO, locks, catálogos de sistema, funções desconhecidas,
+CTEs, subconsultas e UNION continuam bloqueados.
+
+Há até três chamadas totais de geração por pergunta, incluindo correções após
+execução. Somente SQL malformada/resposta final inválida e erros elegíveis de
+sintaxe/resolução permitem correção. Uma nova SQL recebe novo ID, nova validação
+e nova confirmação. Bloqueio de segurança, autenticação, cota, permissão,
+indisponibilidade, timeout ou resultado incerto não causam outra chamada automática.
+Feedback de erro usa categorias fixas, sem mensagens/valores brutos do servidor.
+
+Isso não comprova interpretação de negócio, custo baixo ou segurança para todo
+PostgreSQL arbitrário. O limite de linhas não limita todo processamento nem o
+tamanho de um valor isolado. Política, identidade restrita, RLS e limites são
+camadas complementares.
+
+## CLI e API
+
+```powershell
+backend/.venv/Scripts/python.exe -m askdb.entrypoints.cli
+backend/.venv/Scripts/python.exe -m askdb.entrypoints.api
 ```
 
-O tempo exibido é o tempo total de processamento e varia conforme o ambiente.
-Mensagens de erro incluem dicas de configuração quando disponíveis. Eventos
-técnicos em nível INFO não aparecem na interação normal da CLI.
-Pergunta inválida ou falha tratada permite tentar novamente. `sair`, EOF ou
-Ctrl+C encerra. Não há memória entre perguntas, persistência de conversa ou
-execução da SQL. O comando da API usa o mesmo núcleo e pode ser experimentado
-separadamente pelo Swagger.
+A CLI não depende do servidor HTTP. Cada pergunta pode usar pares anteriores da
+sessão, nunca os resultados. `sair`, EOF ou Ctrl+C encerram e invalidam pendências.
 
-## Evoluções previstas
+A API escuta `127.0.0.1:8000`, oferece Swagger em `http://127.0.0.1:8000/docs` e
+`GET /health` sem consultar dependências. `POST /queries/generate` continua
+aceitando somente `{"question":"Quais são os cinco produtos mais vendidos?"}`.
+A resposta preserva `sql` e `validation.status/reasons` e acrescenta metadados de
+proposta. Cada requisição é independente. A API não possui endpoint de execução,
+nem CORS amplo ou recepção de chaves no corpo HTTP.
 
-O marco produz propostas sem executar a SQL. Execução com confirmação e
-contexto por conexão pertencem à evolução V0; desktop, entrevista e persistência
-pertencem à V1. CTEs e subconsultas permanecerão bloqueadas neste marco e poderão
-ser avaliadas futuramente, com ampliação da política e dos testes.
+Erros usam `{"error":{"code":"...","message":"..."}}`: 422 para entrada/contexto
+excessivo, 503 para configuração/banco/contexto/provedor indisponível (incluindo
+chave/cota remota), 504 para timeout LLM, 502 para resposta inválida ou limite de
+tentativas e 500 para inesperados. As categorias `query_*` descrevem erros da
+execução CLI. Eventos JSON de `askdb` contêm fase, categoria, duração e tentativas,
+sem perguntas, SQLs completas, resultados ou credenciais.
+
+## Classes e organização
+
+O diagrama implementado está no [README principal](../README.md) e em
+[assets/diagrama-classes.mmd](../assets/diagrama-classes.mmd). Ele mantém a linha
+conceitual do apêndice de `docs/relatorio-tecnico`; `InferencePort` é um nome
+antigo substituído por `LLMClientPort`. São 34 tipos próprios, incluindo modelos
+Pydantic e interfaces `Protocol`; API/CLI continuam módulos com funções.
+
+| Tipos | Responsabilidade |
+|---|---|
+| `GenerateSqlUseCase`, `SqlPolicyValidator` | Gerar/corrigir e validar, sem executar |
+| `ExecuteSqlUseCase`, `PendingSqlRegistry`, `ReadOnlyQueryPort` | Confirmação, revalidação e execução única |
+| `SchemaCatalogPort`, `PostgresDatabaseAdapter` | Descoberta autorizada e execução PostgreSQL restrita |
+| `LLMClientPort`, `OllamaLLMClientAdapter`, `DeepSeekLLMClientAdapter`, `OpenAILLMClientAdapter` | Contrato comum e integrações de IA |
+| `ContextBuilder`, `TokenBudgetPolicy`, `KnowledgeFilePort`, `MarkdownKnowledgeAdapter` | Contexto completo por conexão e orçamento |
+| `DataModel`, `SqlGenerationRequest`, `SqlProposal`, `ValidationResult`, `ValidationReason` | Dados/validação do fluxo |
+| `DBConnection`, `LLMProfile`, `LLMContext`, `LLMResponse` | Identidade e comunicação sem chave no perfil |
+| `SessionContext`, `SqlGenerationState`, `ExecuteSqlRequest`, `QueryResult` | Memória, tentativas, confirmação e resultado |
+| `SchemaCatalog`, `Table`, `Column`, `ForeignKey` | Metadados técnicos autorizados |
+| `Settings`, `ApplicationError` | Configuração e falhas controladas |
+
+`bootstrap.build_use_case()` compõe a geração; `build_cli_session()` compartilha
+registro/conexão entre geração e executor. Os modelos não viram automaticamente
+tabelas SQLite. Desktop, entrevista completa, cofre, SQLite, Control Plane,
+amostras e histórico persistente continuam fora desta V0.
+
+## Verificação reproduzível
+
+```powershell
+backend/.venv/Scripts/python.exe backend/scripts/verify_v0.py
+backend/.venv/Scripts/python.exe backend/scripts/verify_v0.py --real-provider ollama
+backend/.venv/Scripts/python.exe backend/scripts/verify_v0.py --real-provider deepseek
+backend/.venv/Scripts/python.exe backend/scripts/verify_v0.py --demo-provider deepseek
+```
+
+O primeiro roteiro executa testes determinísticos e PostgreSQL real, sem chave
+nem inferência. `--real-provider` executa a prova automatizada opt-in com duas
+perguntas, uma confirmação, um cancelamento e uma geração pela API; exige serviço/chave runtime.
+`--demo-provider` abre a CLI para interação manual no ambiente sintético.
+
+Cada execução cria projeto Docker de nome aleatório, porta livre, senhas efêmeras,
+volume exclusivo e pasta temporária de app; ao terminar remove somente os recursos
+que criou. Não reutiliza nem apaga bancos/volumes preexistentes. Saídas capturadas
+pelo roteiro são sanitizadas. Os testes reais são distintos dos simulados; ausência
+de chave não é prova real concluída. Veja o registro de evidências para o estado atual.

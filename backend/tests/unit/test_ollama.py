@@ -4,6 +4,7 @@ import httpx
 import pytest
 
 from askdb.llm.ollama import OllamaLLMClientAdapter
+from askdb.llm.models import LLMContext
 from askdb.queries.errors import ApplicationError
 from askdb.settings import Settings
 
@@ -11,6 +12,11 @@ from askdb.settings import Settings
 def adapter(handler):
     return OllamaLLMClientAdapter(Settings(database_url="postgresql://u:secret@localhost/db"),
                                   transport=httpx.MockTransport(handler))
+
+
+def context(text):
+    return LLMContext(messages=[{"role": "system", "content": "Gere SQL de leitura."},
+                                {"role": "user", "content": text}])
 
 
 @pytest.mark.parametrize("content,expected", [
@@ -24,7 +30,7 @@ def test_final_content_only(content, expected):
         assert "secret" not in request.content.decode()
         assert payload["messages"][0]["role"] == "system"
         return httpx.Response(200, json={"done": True, "message": {"content": content, "thinking": "DELETE FROM produtos"}})
-    assert adapter(handler).generate('{"question":"produtos","schema":[]}') == expected
+    assert adapter(handler).generate(context('{"question":"produtos","schema":[]}')).sql == expected
 
 
 @pytest.mark.parametrize("result", [{}, {"done": True, "message": {}},
@@ -36,7 +42,7 @@ def test_final_content_only(content, expected):
     {"done": True, "message": {"content": "x" * 70000}}, []])
 def test_invalid_responses(result):
     with pytest.raises(ApplicationError) as error:
-        adapter(lambda r: httpx.Response(200, json=result)).generate("pergunta")
+        adapter(lambda r: httpx.Response(200, json=result)).generate(context("pergunta"))
     assert error.value.code == "llm_invalid_response"
 
 
@@ -48,7 +54,7 @@ def test_transport_errors(failure, code):
         calls.append(request)
         raise failure
     with pytest.raises(ApplicationError) as error:
-        adapter(handler).generate("pergunta")
+        adapter(handler).generate(context("pergunta"))
     assert len(calls) == 1 and error.value.code == code and "secret" not in str(error.value)
 
 
@@ -56,5 +62,5 @@ def test_transport_errors(failure, code):
     (httpx.Response(200, text="invalido"), "llm_invalid_response")])
 def test_http_errors(response, code):
     with pytest.raises(ApplicationError) as error:
-        adapter(lambda r: response).generate("pergunta")
+        adapter(lambda r: response).generate(context("pergunta"))
     assert error.value.code == code

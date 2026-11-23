@@ -28,3 +28,24 @@ def test_catalog_and_proposal():
     assert proposal.model_dump()["validation"] == {"status": "approved", "reasons": []}
     with pytest.raises(ValidationError):
         ValidationResult(status="blocked")
+
+
+def test_v0_confirmation_and_session_do_not_carry_results():
+    from askdb.llm.models import LLMContext, LLMResponse
+    from askdb.queries.models import ExecuteSqlRequest, QueryResult, SessionContext, SqlGenerationState
+    for value in (False, 1, "sim", None):
+        with pytest.raises(ValidationError):
+            ExecuteSqlRequest(proposal_id="p", connection_id="c", session_id="s", confirmed=value)
+    with pytest.raises(ValidationError):
+        ExecuteSqlRequest(proposal_id="p", connection_id="c", session_id="s", confirmed=True, sql="SELECT 2")
+    session = SessionContext(connection_id="c", question_sql_pairs=[("pergunta", "SELECT 1")])
+    session.active_question = SqlGenerationState(question="pergunta", attempts=2)
+    with pytest.raises(ValidationError):
+        SqlGenerationState(question="pergunta", attempts=4)
+    old_id = session.id
+    session.reset("other")
+    assert session.id != old_id and session.question_sql_pairs == [] and session.active_question is None
+    result = QueryResult(columns=["nome", "nome"], rows=[("a", "b")], duration_ms=1.0)
+    assert result.rows[0] == ("a", "b")
+    assert "rows" not in SessionContext.model_fields and "rows" not in LLMContext.model_fields
+    assert LLMResponse(sql="SELECT 1").input_tokens is None

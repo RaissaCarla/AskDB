@@ -1,24 +1,43 @@
 import psycopg
-from psycopg.rows import dict_row
+from psycopg.rows import dict_row, tuple_row
+import time
+from uuid import uuid4
 
+from askdb.connections.models import DBConnection
 from askdb.databases.catalog import Column, ForeignKey, SchemaCatalog, Table
 from askdb.queries.errors import ApplicationError
+from askdb.queries.models import QueryResult
 
 
 class PostgresDatabaseAdapter:
-    def __init__(self, database_url: str):
+    def __init__(self, database_url: str, *, max_rows: int = 100, statement_timeout_ms: int = 30000):
         self._database_url = database_url
+        if not 1 <= max_rows <= 1000 or not 1 <= statement_timeout_ms <= 30000:
+            raise ApplicationError("configuration_error", "Confira os limites de execução.")
+        self.max_rows = max_rows
+        self.statement_timeout_ms = statement_timeout_ms
+        try:
+            self.identity = DBConnection.from_url(database_url)
+        except ApplicationError:
+            self.identity = None
+
+    def _check_role(self, connection):
+        role = connection.execute(
+            "SELECT rolsuper, rolbypassrls, current_user AS effective_role, "
+            "current_database() AS effective_database FROM pg_roles WHERE rolname = current_user"
+        ).fetchone()
+        if not role or role["rolsuper"] or role["rolbypassrls"]:
+            raise ApplicationError("configuration_error", "Use uma role sem superusuário ou BYPASSRLS.")
+        if self.identity is not None and (role.get("effective_role") != self.identity.role
+                or role.get("effective_database") != self.identity.database):
+            raise ApplicationError("connection_mismatch", "A identidade efetiva diverge da conexão configurada.")
 
     def discover(self) -> SchemaCatalog:
         try:
             with psycopg.connect(self._database_url, connect_timeout=10,
-                                 options="-c statement_timeout=10000 -c default_transaction_read_only=on",
+                                 options="-c statement_timeout=10000 -c default_transaction_read_only=on -c search_path=pg_catalog,public",
                                  row_factory=dict_row) as connection:
-                role = connection.execute(
-                    "SELECT rolsuper, rolbypassrls FROM pg_roles WHERE rolname = current_user"
-                ).fetchone()
-                if not role or role["rolsuper"] or role["rolbypassrls"]:
-                    raise ApplicationError("configuration_error", "Use uma role sem superusuário ou BYPASSRLS.")
+                self._check_role(connection)
                 rows = connection.execute("""
                     SELECT c.oid, n.nspname, c.relname, a.attnum, a.attname,
                            format_type(a.atttypid,a.atttypmod) AS data_type,
@@ -66,3 +85,44 @@ class PostgresDatabaseAdapter:
             raise
         except psycopg.Error:
             raise ApplicationError("database_unavailable", "Não foi possível descobrir o esquema PostgreSQL.") from None
+
+    def execute(self, connection_id: str, sql: str) -> QueryResult:
+        if self.identity is None or connection_id != self.identity.id:
+            raise ApplicationError("connection_mismatch", "O executor está vinculado a outra conexão.")
+        started = time.monotonic()
+        connection = None
+        try:
+            connection = psycopg.connect(self._database_url, connect_timeout=10, row_factory=dict_row,
+                options=f"-c default_transaction_read_only=on -c statement_timeout={self.statement_timeout_ms} "
+                        "-c lock_timeout=5000 -c search_path=pg_catalog,public")
+            connection.execute("SET TRANSACTION READ ONLY")
+            self._check_role(connection)
+            with connection.cursor(name="askdb_" + uuid4().hex, row_factory=tuple_row) as cursor:
+                cursor.execute(sql)
+                rows = cursor.fetchmany(self.max_rows + 1)
+                columns = [item.name for item in cursor.description]
+            return QueryResult(columns=columns, rows=rows[:self.max_rows],
+                               truncated=len(rows) > self.max_rows,
+                               duration_ms=round((time.monotonic() - started) * 1000, 3))
+        except ApplicationError:
+            raise
+        except psycopg.errors.QueryCanceled:
+            raise ApplicationError("query_timeout", "A consulta foi cancelada ou excedeu o tempo limite.") from None
+        except psycopg.errors.InsufficientPrivilege:
+            raise ApplicationError("query_permission_denied", "A role não pode realizar essa consulta.") from None
+        except (psycopg.errors.UndefinedColumn, psycopg.errors.UndefinedTable):
+            raise ApplicationError("query_resolution_error", "A consulta referencia tabela ou coluna não disponível.") from None
+        except psycopg.errors.SyntaxError:
+            raise ApplicationError("query_syntax_error", "A consulta contém um erro de sintaxe PostgreSQL.") from None
+        except psycopg.OperationalError:
+            raise ApplicationError("database_unavailable", "O PostgreSQL não está disponível para concluir a consulta.") from None
+        except psycopg.Error:
+            raise ApplicationError("query_failed", "Não foi possível concluir a consulta com segurança.") from None
+        finally:
+            if connection is not None:
+                try:
+                    connection.rollback()
+                except psycopg.Error:
+                    pass
+                finally:
+                    connection.close()

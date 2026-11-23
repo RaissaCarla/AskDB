@@ -7,6 +7,7 @@ from fastapi.testclient import TestClient
 from askdb.databases.postgres import PostgresDatabaseAdapter
 from askdb.entrypoints.api import create_app
 from askdb.entrypoints.cli import run
+from askdb.llm.models import LLMResponse
 from askdb.queries.generate import GenerateSqlUseCase
 from askdb.queries.policy import SqlPolicyValidator
 
@@ -19,7 +20,7 @@ def test_real_catalog_with_simulated_llm():
         pytest.skip("Defina ASKDB_TEST_DATABASE_URL para o banco de teste.")
     catalog = Mock(wraps=PostgresDatabaseAdapter(url))
     llm = Mock()
-    llm.generate.return_value = "SELECT nome FROM public.produtos LIMIT 5"
+    llm.generate.return_value = LLMResponse(sql="SELECT nome FROM public.produtos LIMIT 5")
     use_case = GenerateSqlUseCase(catalog, llm, SqlPolicyValidator())
     response = TestClient(create_app(use_case)).post("/queries/generate", json={"question": "produtos"})
     assert response.status_code == 200 and response.json()["validation"]["status"] == "approved"
@@ -31,5 +32,5 @@ def test_real_catalog_with_simulated_llm():
     assert len(catalog.mock_calls) == 2
     assert all(call[0] == "discover" for call in catalog.mock_calls)
     for call in llm.generate.call_args_list:
-        context = call.args[0]
+        context = call.args[0].messages[1]["content"]
         assert '"name": "restrita"' not in context and '"name": "privado"' not in context

@@ -1,104 +1,178 @@
 classDiagram
-    direction TB
-
+    direction LR
     class GenerateSqlUseCase {
-        +SchemaCatalogPort catalog
-        +LLMClientPort llm
-        +SqlPolicyValidator validator
-        +execute(SqlGenerationRequest request) SqlProposal
+        +execute(SqlGenerationRequest) SqlProposal
+        +correct(SqlProposal, ApplicationError) SqlProposal
+    }
+    class ContextBuilder {
+        +build(connection_id, question, session) LLMContext
+    }
+    class TokenBudgetPolicy {
+        +validate(memory, context) LLMContext
+    }
+    class ExecuteSqlUseCase {
+        +execute(ExecuteSqlRequest) QueryResult
+    }
+    class PendingSqlRegistry {
+        +register(SqlProposal) str
+        +get(id, connection_id, session_id) SqlProposal
+        +consume(id, connection_id, session_id) SqlProposal
+        +invalidate_session(session_id)
+    }
+    class LLMClientPort {
+        <<Protocol>>
+        +generate(LLMContext) LLMResponse
     }
     class SchemaCatalogPort {
         <<Protocol>>
         +discover() SchemaCatalog
     }
-    class LLMClientPort {
+    class ReadOnlyQueryPort {
         <<Protocol>>
-        +generate(str context) str
+        +execute(connection_id, sql) QueryResult
     }
-    class PostgresDatabaseAdapter {
-        -str _database_url
-        +discover() SchemaCatalog
-    }
-    class OllamaLLMClientAdapter {
-        +Settings settings
-        +transport
-        +generate(str context) str
+    class KnowledgeFilePort {
+        <<Protocol>>
+        +read(connection_id) str
     }
     class SqlPolicyValidator {
-        +validate(str sql) ValidationResult
+        +validate(sql) ValidationResult
     }
-    class Settings {
-        +SecretStr database_url
-        +str ollama_url
-        +str ollama_model
-        +float llm_timeout
-        +float connect_timeout
-        +from_env(environ, env_file) Settings
+    class MarkdownKnowledgeAdapter {
+        +prepare(connection_id) Path
+        +path(connection_id) Path
+        +read(connection_id) str
     }
-    class ApplicationError {
-        +str code
-        +str message
+    class PostgresDatabaseAdapter {
+        +discover() SchemaCatalog
+        +execute(connection_id, sql) QueryResult
+    }
+    class OllamaLLMClientAdapter
+    class DeepSeekLLMClientAdapter
+    class OpenAILLMClientAdapter
+    class DBConnection {
+        +host
+        +port
+        +database
+        +role
+        +id
+    }
+    class LLMProfile {
+        +provider
+        +endpoint
+        +model
+        +context_window
+        +output_reserve
+    }
+    class LLMContext {
+        +messages
+        +input_tokens_estimate
+        +memory_tokens_estimate
+    }
+    class LLMResponse {
+        +sql
+        +input_tokens
+        +output_tokens
+    }
+    class SessionContext {
+        +connection_id
+        +question_sql_pairs
+        +active_question
+        +reset(connection_id)
+    }
+    class SqlGenerationState {
+        +question
+        +attempts
+        +terminal
+    }
+    class ExecuteSqlRequest {
+        +proposal_id
+        +connection_id
+        +session_id
+        +confirmed
+    }
+    class QueryResult {
+        +columns
+        +rows
+        +duration_ms
+        +truncated
+    }
+    class SqlGenerationRequest {
+        +question
+    }
+    class SqlProposal {
+        +id
+        +sql
+        +validation
+        +connection_id
+        +session_id
+        +question_id
+        +attempt
     }
     class DataModel {
         <<Pydantic>>
-        +model_config : strict, extra=forbid
-    }
-    class SqlGenerationRequest {
-        +str question
-        +normalize(value)
-    }
-    class SqlProposal {
-        +str sql
-        +ValidationResult validation
     }
     class ValidationResult {
-        +status : approved ou blocked
-        +List~ValidationReason~ reasons
-        +consistent()
+        +status
+        +reasons
     }
-    class ValidationReason {
-        +str code
-        +str message
+    class ValidationReason
+    class SchemaCatalog
+    class Table
+    class Column
+    class ForeignKey
+    class Settings {
+        +app_data_dir
+        +max_rows
+        +connection
+        +profile() LLMProfile
     }
-    class SchemaCatalog {
-        +List~Table~ tables
-    }
-    class Table {
-        +str schema_name
-        +str name
-        +List~Column~ columns
-        +List~str~ primary_key
-        +List~ForeignKey~ foreign_keys
-    }
-    class Column {
-        +str name
-        +str data_type
-        +bool nullable
-    }
-    class ForeignKey {
-        +List~str~ columns
-        +str target_schema
-        +str target_table
-        +List~str~ target_columns
-    }
-
-    GenerateSqlUseCase --> SchemaCatalogPort : consulta
-    GenerateSqlUseCase --> LLMClientPort : solicita proposta
-    GenerateSqlUseCase --> SqlPolicyValidator : valida
-    GenerateSqlUseCase ..> SqlGenerationRequest : recebe
-    GenerateSqlUseCase ..> SqlProposal : retorna
-    GenerateSqlUseCase ..> ApplicationError : propaga
-    SchemaCatalogPort <|.. PostgresDatabaseAdapter : conformidade estrutural
-    LLMClientPort <|.. OllamaLLMClientAdapter : conformidade estrutural
-    PostgresDatabaseAdapter ..> SchemaCatalog : retorna
-    OllamaLLMClientAdapter --> Settings : configuracao
-    SqlPolicyValidator ..> ValidationResult : retorna
-    SqlProposal "1" --> "1" ValidationResult : validation
-    ValidationResult "1" --> "0..*" ValidationReason : reasons
-    SchemaCatalog "1" --> "0..*" Table : tables
-    Table "1" --> "0..*" Column : columns
-    Table "1" --> "0..*" ForeignKey : foreign_keys
-
+    class ApplicationError
+    GenerateSqlUseCase --> ContextBuilder
+    GenerateSqlUseCase --> LLMClientPort
+    GenerateSqlUseCase --> SqlPolicyValidator
+    GenerateSqlUseCase --> PendingSqlRegistry
+    GenerateSqlUseCase --> SessionContext
+    GenerateSqlUseCase ..> SqlGenerationRequest
+    GenerateSqlUseCase ..> SqlProposal
+    ContextBuilder --> SchemaCatalogPort
+    ContextBuilder --> KnowledgeFilePort
+    ContextBuilder --> TokenBudgetPolicy
+    ContextBuilder ..> LLMContext
+    TokenBudgetPolicy --> LLMProfile
+    ExecuteSqlUseCase --> PendingSqlRegistry
+    ExecuteSqlUseCase --> SqlPolicyValidator
+    ExecuteSqlUseCase --> ReadOnlyQueryPort
+    ExecuteSqlUseCase ..> ExecuteSqlRequest
+    ExecuteSqlUseCase ..> QueryResult
+    PendingSqlRegistry o-- SqlProposal
+    SchemaCatalogPort <|.. PostgresDatabaseAdapter
+    ReadOnlyQueryPort <|.. PostgresDatabaseAdapter
+    KnowledgeFilePort <|.. MarkdownKnowledgeAdapter
+    LLMClientPort <|.. OllamaLLMClientAdapter
+    LLMClientPort <|.. DeepSeekLLMClientAdapter
+    LLMClientPort <|.. OpenAILLMClientAdapter
+    DeepSeekLLMClientAdapter --> LLMProfile
+    OpenAILLMClientAdapter --> LLMProfile
+    OllamaLLMClientAdapter --> Settings
+    SessionContext --> SqlGenerationState
+    SessionContext ..> DBConnection
+    SqlProposal --> ValidationResult
+    ValidationResult o-- ValidationReason
+    SchemaCatalog o-- Table
+    Table o-- Column
+    Table o-- ForeignKey
+    Settings ..> DBConnection
+    Settings ..> LLMProfile
+    GenerateSqlUseCase ..> ApplicationError
+    DataModel <|-- DBConnection
+    DataModel <|-- LLMProfile
+    DataModel <|-- LLMContext
+    DataModel <|-- LLMResponse
+    DataModel <|-- SessionContext
+    DataModel <|-- SqlGenerationState
+    DataModel <|-- ExecuteSqlRequest
+    DataModel <|-- QueryResult
     DataModel <|-- SqlGenerationRequest
     DataModel <|-- SqlProposal
     DataModel <|-- ValidationResult
@@ -107,8 +181,7 @@ classDiagram
     DataModel <|-- Table
     DataModel <|-- Column
     DataModel <|-- ForeignKey
-
-    note for DataModel "Herda BaseModel (Pydantic)."
-    note for Settings "Herda BaseModel; carrega backend/.env."
-    note for ApplicationError "Herda Exception."
-    note for GenerateSqlUseCase "FastAPI e CLI chamam execute().\nbootstrap.build_use_case() conecta os adaptadores.\nNao executa SQL."
+    note for GenerateSqlUseCase "Somente gera e valida; nao executa SQL."
+    note for ExecuteSqlUseCase "Confirmacao da SQL exata; consumo atomico antes do banco."
+    note for SessionContext "Somente perguntas e SQLs; sem resultados."
+    note for Settings "Dados locais em LOCALAPPDATA/AskDB; perfis sem chave."

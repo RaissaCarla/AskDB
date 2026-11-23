@@ -5,6 +5,7 @@ import pytest
 from pydantic import ValidationError
 
 from askdb.databases.catalog import Column, SchemaCatalog, Table
+from askdb.llm.models import LLMResponse
 from askdb.queries.errors import ApplicationError
 from askdb.queries.generate import GenerateSqlUseCase
 from askdb.queries.models import SqlGenerationRequest
@@ -16,7 +17,7 @@ def make_use_case(sql="SELECT nome FROM produtos"):
     catalog.discover.return_value = SchemaCatalog(tables=[Table(schema_name="public", name="produtos",
         columns=[Column(name="nome", data_type="text", nullable=False)])])
     llm = Mock()
-    llm.generate.return_value = sql
+    llm.generate.return_value = LLMResponse(sql=sql)
     return GenerateSqlUseCase(catalog, llm, SqlPolicyValidator())
 
 
@@ -29,7 +30,7 @@ def test_generation_and_no_execution(sql, status, caplog):
     use_case.catalog.discover.assert_called_once_with()
     assert len(use_case.catalog.mock_calls) == 1
     use_case.llm.generate.assert_called_once()
-    context = json.loads(use_case.llm.generate.call_args.args[0])
+    context = json.loads(use_case.llm.generate.call_args.args[0].messages[1]["content"])
     assert context["schema"]["tables"][0]["name"] == "produtos"
     assert "pergunta confidencial" not in caplog.text and sql not in caplog.text
 
