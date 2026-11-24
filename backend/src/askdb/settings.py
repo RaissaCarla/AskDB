@@ -12,6 +12,10 @@ from askdb.queries.errors import ApplicationError
 ENV_FILE = Path(__file__).resolve().parents[2] / ".env"
 
 
+def read_environment(env_file: Path = ENV_FILE) -> dict[str, str | None]:
+    return {**dotenv_values(env_file, encoding="utf-8-sig", interpolate=False), **os.environ}
+
+
 def default_app_data_dir() -> Path:
     override = os.getenv("ASKDB_APP_DATA_DIR")
     base = os.getenv("LOCALAPPDATA")
@@ -95,9 +99,7 @@ class Settings(BaseModel):
                  "ASKDB_APP_DATA_DIR": "app_data_dir"}
         try:
             # O .env legado continua válido; chaves remotas não são lidas dele.
-            source = environ if environ is not None else {
-                **dotenv_values(env_file, encoding="utf-8-sig", interpolate=False), **os.environ
-            }
+            source = environ if environ is not None else read_environment(env_file)
             fields = {field: source[name] for name, field in names.items() if name in source}
             if "app_data_dir" not in fields and source.get("LOCALAPPDATA"):
                 fields["app_data_dir"] = Path(source["LOCALAPPDATA"]) / "AskDB"

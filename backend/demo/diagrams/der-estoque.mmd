@@ -1,0 +1,32 @@
+---
+title: "DER · Estoque (demo_estoque)"
+---
+erDiagram
+    direction LR
+
+    produtos ||..o{ posicoes_estoque : "aparece em"
+    depositos ||..o{ posicoes_estoque : "armazena"
+
+    produtos {
+        text nome PK
+        text sku UK
+        text categoria
+        integer estoque_minimo
+    }
+
+    depositos {
+        integer id PK
+        text nome UK
+        text cidade
+        text tipo
+        boolean ativo
+    }
+
+    posicoes_estoque {
+        integer id PK
+        text produto FK "Referência a produtos.nome"
+        integer quantidade_fisica
+        integer quantidade_reservada
+        integer quantidade_avariada
+        integer deposito_id FK "Par único com produto"
+    }

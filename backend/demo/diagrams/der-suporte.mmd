@@ -1,0 +1,31 @@
+---
+title: "DER · Suporte (demo_suporte)"
+---
+erDiagram
+    direction LR
+
+    equipes |o..o{ chamados : "atende"
+    categorias |o..o{ chamados : "classifica"
+
+    equipes {
+        integer id PK
+        text nome UK
+        text canal_principal
+    }
+
+    categorias {
+        integer id PK
+        text nome UK
+        integer sla_horas
+    }
+
+    chamados {
+        integer id PK
+        text assunto
+        text status
+        integer equipe_id FK "Opcional"
+        integer categoria_id FK "Opcional"
+        date created_at
+        date resolvido_em "Opcional"
+        text prioridade
+    }

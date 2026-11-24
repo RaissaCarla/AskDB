@@ -1,15 +1,18 @@
 from datetime import date
 from decimal import Decimal
+from io import StringIO
 import json
 from unittest.mock import Mock
 
 import httpx
 import pytest
 from pydantic import SecretStr
+from rich.console import Console
 
 from askdb.bootstrap import build_cli_session
 from askdb.databases.catalog import Column, SchemaCatalog, Table
-from askdb.entrypoints import cli
+from askdb.entrypoints.cli import app as cli
+from askdb.entrypoints.cli.terminal import Terminal
 from askdb.llm.models import LLMResponse
 from askdb.queries.errors import ApplicationError
 from askdb.queries.models import QueryResult
@@ -54,7 +57,7 @@ def test_cancellation_and_confirmation_interrupt_never_execute(tmp_path, monkeyp
             context_path=path, destination=settings.connection.label)
     execution.query.execute.assert_not_called()
     assert len(calls) == 1 and generation.session.question_sql_pairs == []
-    assert str(path) in "\n".join(output)
+    assert str(path) in "".join(output).replace("\n", "")
 
 
 def test_sql_and_destination_before_confirmation_and_no_results_to_llm(tmp_path, monkeypatch):
@@ -90,6 +93,39 @@ def test_table_format_preserves_positions_types_and_empty():
     text = "\n".join(cli.format_result(result))
     assert "12.50" in text and "2026-11-17" in text and "NULL" in text and "truncado" in text
     assert cli.format_result(QueryResult(columns=["nome"],rows=[],duration_ms=0.0))[-1].startswith("0 linha")
+
+
+@pytest.mark.parametrize("width", [44, 100])
+def test_rich_output_wraps_and_keeps_sql_confirmation_exact(tmp_path, monkeypatch, width):
+    settings, generation, execution, _, _ = runtime(tmp_path, monkeypatch)
+    sql = "SELECT nome FROM produtos WHERE nome = '[red]texto[/red]' ORDER BY nome"
+    generation.llm = Mock()
+    generation.llm.generate.side_effect = [
+        ApplicationError("llm_unavailable", "Provedor indisponível."),
+        LLMResponse(sql="DELETE FROM produtos"),
+        LLMResponse(sql=sql),
+        LLMResponse(sql=sql),
+        LLMResponse(sql=sql),
+    ]
+    execution.query.execute.side_effect = [
+        QueryResult(columns=["nome"], rows=[], duration_ms=1),
+        QueryResult(columns=["nome"], rows=[("[red]texto[/red]\x1b[0m",)], duration_ms=1),
+    ]
+    buffer = StringIO()
+    console = Console(file=buffer, color_system=None, width=width)
+    entries = ["erro", "bloqueada", "cancelada", "não", "vazia", "sim", "resultado", "sim", "sair"]
+    cli.run(generation, read=read_entries(entries), executor=execution, destination=settings.connection.label,
+            terminal=Terminal(console=console))
+    text = buffer.getvalue()
+    assert "\x1b" not in text
+    assert all(len(line) <= width for line in text.splitlines())
+    assert "SQL proposta" in text and "[Bloqueada]" in text and "Execução cancelada" in text
+    assert "[Erro] Provedor indisponível." in text
+    assert text.index("Destino da execução") < text.index("Resultado")
+    assert "Nenhuma linha retornada." in text
+    assert "[red]texto[/red]\\x1b[0m" in text
+    assert execution.query.execute.call_count == 2
+    assert all(call.args == (settings.connection.id, sql) for call in execution.query.execute.call_args_list)
 
 
 def test_main_key_input_and_profile_selection(tmp_path, monkeypatch):

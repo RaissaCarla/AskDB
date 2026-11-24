@@ -57,7 +57,8 @@ def test_infrastructure_failure_never_retries(code, caplog):
 
 
 @pytest.mark.parametrize("sql", ["DELETE FROM produtos", "SELECT 1; DELETE FROM produtos", "SELECT pg_sleep(1)",
-    "WITH x AS (SELECT 1) SELECT * FROM x"])
+    "WITH x AS (SELECT 1) SELECT * FROM x", "SELECT COUNT(*)::text, pg_sleep(1) FROM chamados",
+    "SELECT COUNT(*)::text FROM pg_catalog.pg_roles"])
 def test_security_blocks_never_retry(sql):
     use_case = session_use_case()
     use_case.llm.generate.return_value = LLMResponse(sql=sql)
@@ -65,6 +66,21 @@ def test_security_blocks_never_retry(sql):
     assert item.validation.status == "blocked" and use_case.llm.generate.call_count == 1
     with pytest.raises(ApplicationError):
         use_case.correct(item, ApplicationError("query_syntax_error", ""))
+
+
+def test_scalar_cast_is_retried_without_registering_the_blocked_sql():
+    use_case = session_use_case()
+    monthly = ("SELECT COUNT(*) FROM chamados WHERE EXTRACT(MONTH FROM created_at) = "
+               "EXTRACT(MONTH FROM CURRENT_DATE) AND EXTRACT(YEAR FROM created_at) = "
+               "EXTRACT(YEAR FROM CURRENT_DATE)")
+    rejected = monthly.replace("COUNT(*)", "COUNT(*)::text")
+    use_case.llm.generate.side_effect = [LLMResponse(sql=rejected), LLMResponse(sql=monthly)]
+
+    proposal = use_case.execute(SqlGenerationRequest(question="quantos chamados temos esse mês?"))
+    assert proposal.attempt == 2 and proposal.sql == monthly
+    assert use_case.session.question_sql_pairs == [("quantos chamados temos esse mês?", monthly)]
+    payload = json.loads(use_case.llm.generate.call_args.args[0].messages[1]["content"])
+    assert payload["correction"] == {"category": "unsupported_cast", "previous_sql": rejected}
 
 
 def test_invalid_final_response_caps_at_three_and_new_budget_per_correction():

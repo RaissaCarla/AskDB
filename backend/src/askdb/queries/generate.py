@@ -9,7 +9,7 @@ from askdb.knowledge.budget import TokenBudgetPolicy
 from askdb.knowledge.context import ContextBuilder
 from askdb.queries.errors import ApplicationError
 from askdb.queries.models import SessionContext, SqlGenerationRequest, SqlGenerationState, SqlProposal
-from askdb.queries.policy import SqlPolicyValidator
+from askdb.queries.policy import RETRYABLE_PROPOSAL_CODES, SqlPolicyValidator
 from askdb.queries.pending import PendingSqlRegistry
 
 logger = logging.getLogger("askdb")
@@ -79,8 +79,10 @@ class GenerateSqlUseCase:
                 phase = "policy"
                 result = self.validator.validate(response.sql)
                 code = result.status
-                if result.status == "blocked" and all(r.code == "invalid_sql" for r in result.reasons) and state.attempts < 3:
-                    state.feedback_code = "invalid_sql"
+                reasons = {reason.code for reason in result.reasons}
+                if (result.status == "blocked" and len(reasons) == 1
+                        and reasons <= RETRYABLE_PROPOSAL_CODES and state.attempts < 3):
+                    state.feedback_code = reasons.pop()
                     continue
                 proposal = SqlProposal(sql=response.sql, validation=result, connection_id=self.connection_id,
                     session_id=session.id, question_id=state.id, attempt=state.attempts)

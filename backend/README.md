@@ -6,6 +6,8 @@ DeepSeek BYOK, Ollama e OpenAI usam o mesmo contrato. O estado das verificaçõe
 reais e simuladas está em [evidencias-v0.md](evidencias-v0.md); o registro do marco
 anterior permanece em `evidencias-marco20.md`.
 
+Para apresentar a V0 com três bancos fictícios, siga o [guia da demo no Windows](demo/README.md).
+
 ## Preparar ambiente
 
 Na raiz do repositório, com Python 3.11+:
@@ -142,13 +144,15 @@ Artefatos oficiais DeepSeek V4 e Qwen3.5-9B estão fixados por SHA-256 em
    com rollback/fechamento também em erro ou cancelamento.
 
 A política admite SELECT simples, filtros, JOIN, agrupamento, ordenação, DISTINCT,
-LIMIT/OFFSET e COUNT, SUM, AVG, MIN, MAX, LOWER, UPPER, COALESCE. Escrita, DDL,
+LIMIT/OFFSET e COUNT, SUM, AVG, MIN, MAX, LOWER, UPPER, COALESCE. Para períodos,
+admite CURRENT_DATE e EXTRACT de mês ou ano de uma coluna ou de CURRENT_DATE. Escrita, DDL,
 comandos múltiplos, INTO, locks, catálogos de sistema, funções desconhecidas,
 CTEs, subconsultas e UNION continuam bloqueados.
 
 Há até três chamadas totais de geração por pergunta, incluindo correções após
-execução. Somente SQL malformada/resposta final inválida e erros elegíveis de
-sintaxe/resolução permitem correção. Uma nova SQL recebe novo ID, nova validação
+execução. SQL malformada, resposta final inválida, conversão para texto ou inteiro
+em um SELECT compatível e erros elegíveis de sintaxe/resolução permitem correção.
+A conversão permanece bloqueada e a nova proposta deve removê-la. Uma nova SQL recebe novo ID, nova validação
 e nova confirmação. Bloqueio de segurança, autenticação, cota, permissão,
 indisponibilidade, timeout ou resultado incerto não causam outra chamada automática.
 Feedback de erro usa categorias fixas, sem mensagens/valores brutos do servidor.
@@ -187,8 +191,15 @@ sem perguntas, SQLs completas, resultados ou credenciais.
 O diagrama implementado está no [README principal](../README.md) e em
 [assets/diagrama-classes.mmd](../assets/diagrama-classes.mmd). Ele mantém a linha
 conceitual do apêndice de `docs/relatorio-tecnico`; `InferencePort` é um nome
-antigo substituído por `LLMClientPort`. São 34 tipos próprios, incluindo modelos
-Pydantic e interfaces `Protocol`; API/CLI continuam módulos com funções.
+antigo substituído por `LLMClientPort`. A organização segue a arquitetura
+hexagonal pragmática, com os casos de uso em `queries/` e contratos nas
+fronteiras com o PostgreSQL, a IA e os arquivos de contexto.
+
+Os adaptadores de entrada ficam em `entrypoints/`. A API está em `api.py`.
+O pacote `cli/` agrupa o comando em `__main__.py`, a interação e as sessões em
+`app.py`, a formatação Rich em `terminal.py` e o catálogo da demo em `demo.py`.
+O script `backend/demo/prepare.py` cuida do Compose e instala os contextos de
+exemplo.
 
 | Tipos | Responsabilidade |
 |---|---|

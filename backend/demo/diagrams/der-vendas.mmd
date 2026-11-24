@@ -1,0 +1,32 @@
+---
+title: "DER · Vendas (demo_vendas)"
+---
+erDiagram
+    direction LR
+
+    clientes |o..o{ pedidos : "faz"
+    pedidos ||..o{ pagamentos : "recebe"
+
+    clientes {
+        integer id PK
+        text nome
+        text segmento
+        text cidade
+    }
+
+    pedidos {
+        integer id PK
+        text status
+        numeric valor_total "Precisão 10, escala 2"
+        integer cliente_id FK "Opcional"
+        date criado_em
+        text canal
+    }
+
+    pagamentos {
+        integer id PK
+        integer pedido_id FK
+        text meio
+        text status
+        numeric valor "Precisão 10, escala 2"
+    }

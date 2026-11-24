@@ -9,6 +9,8 @@ from askdb.queries.policy import SqlPolicyValidator
     "SELECT DISTINCT LOWER(nome), UPPER(nome), COALESCE(preco,0) FROM produtos WHERE preco BETWEEN 1 AND 30 AND nome IS NOT NULL",
     "SELECT COUNT(*), AVG(preco), MIN(preco), MAX(preco) FROM produtos",
     "SELECT nome FROM produtos WHERE id IN (1,2) OR nome LIKE 'C%'",
+    "SELECT COUNT(*) FROM chamados WHERE EXTRACT(MONTH FROM created_at) = EXTRACT(MONTH FROM CURRENT_DATE) "
+    "AND EXTRACT(YEAR FROM created_at) = EXTRACT(YEAR FROM CURRENT_DATE)",
 ])
 def test_allowed(sql):
     assert SqlPolicyValidator().validate(sql).status == "approved"
@@ -25,6 +27,10 @@ def test_allowed(sql):
     "SELECT * FROM (SELECT * FROM produtos) p", "SELECT (SELECT 1)",
     "SELECT * FROM produtos WHERE EXISTS (SELECT 1)", "SELECT * FROM generate_series(1,10)",
     "SELECT row_number() OVER () FROM produtos", "SELECT CAST(preco AS text) FROM produtos",
+    "SELECT EXTRACT(EPOCH FROM created_at) FROM chamados",
+    "SELECT EXTRACT(YEAR FROM pg_sleep(1))",
+    "SELECT EXTRACT(MONTH FROM (SELECT CURRENT_DATE))",
+    "SELECT COUNT(*)::text FROM chamados",
 ])
 def test_blocked_and_deterministic(sql):
     validator = SqlPolicyValidator()
